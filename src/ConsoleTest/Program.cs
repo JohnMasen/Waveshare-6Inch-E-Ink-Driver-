@@ -58,7 +58,7 @@ namespace ConsoleTest
             Console.WriteLine($"IsLittleEndian:{BitConverter.IsLittleEndian} ");
 
 
-            IT8951SPIDevice device = new IT8951SPIDevice(spi, 5);
+            IT8951SPIDevice device = new IT8951SPIDevice(spi, 24);
 
             Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(settings));
             
