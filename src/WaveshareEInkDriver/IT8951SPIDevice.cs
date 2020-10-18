@@ -58,7 +58,7 @@ namespace WaveshareEInkDriver
         private byte[] sendCommandBuffer = new byte[4] { 0x60, 0x00, 0x00, 0x00 };
         private readonly byte[] receiveDataPrebeam = new byte[2] { 0x10, 0x00 };
         GpioController controller;
-        private int readyPin;
+        private int readyPin,resetPin;
         [StructLayout(LayoutKind.Explicit, CharSet = CharSet.Ansi, Size = 40)]
         private struct DeviceInfoInternal
         {
@@ -94,6 +94,23 @@ namespace WaveshareEInkDriver
 
         }
         [StructLayout(LayoutKind.Explicit)]
+        private struct DisplayWithAreaInfo
+        {
+            [FieldOffset(0)]
+            public short X;
+            [FieldOffset(2)]
+            public short Y;
+            [FieldOffset(4)]
+            public short Width;
+            [FieldOffset(6)]
+            public short Height;
+            [FieldOffset(8)]
+            public short Mode;
+            [FieldOffset(10)]
+            public int address;
+
+        }
+        [StructLayout(LayoutKind.Explicit)]
         private struct LoadImageAreaInfo
         {
             [FieldOffset(0)]
@@ -108,26 +125,40 @@ namespace WaveshareEInkDriver
             public short Height;
         }
 
-        public IT8951SPIDevice(int spiDeviceId, int CSPin, int HRDYpin)
+        //public IT8951SPIDevice(int spiDeviceId, int CSPin, int HRDYpin)
+        //{
+        //    SpiConnectionSettings settings = new SpiConnectionSettings(spiDeviceId, CSPin);
+        //    settings.ClockFrequency = 2000000; //safe clock time
+        //    settings.Mode = SpiMode.Mode0;
+        //    settings.ChipSelectLineActiveState = PinValue.Low;
+        //    settings.DataFlow = DataFlow.MsbFirst;
+        //    initInternal(SpiDevice.Create(settings), HRDYpin);
+        //}
+        public IT8951SPIDevice(SpiDevice spiDevice, int HRDYPin,int RSTPin)
         {
-            SpiConnectionSettings settings = new SpiConnectionSettings(spiDeviceId, CSPin);
-            settings.ClockFrequency = 2000000; //safe clock time
-            settings.Mode = SpiMode.Mode0;
-            settings.ChipSelectLineActiveState = PinValue.Low;
-            settings.DataFlow = DataFlow.MsbFirst;
-            initInternal(SpiDevice.Create(settings), HRDYpin);
-        }
-        public IT8951SPIDevice(SpiDevice spiDevice, int HRDYPin)
-        {
-            initInternal(spiDevice, HRDYPin);
+            initInternal(spiDevice, HRDYPin, RSTPin);
         }
 
-        private void initInternal(SpiDevice spiDevice, int HRDYPin)
+        private void initInternal(SpiDevice spiDevice, int HRDYPin,int RSTPin)
         {
             controller = new GpioController();
             controller.OpenPin(HRDYPin, PinMode.Input);
             readyPin = HRDYPin;
+            controller.OpenPin(RSTPin, PinMode.Output);
+            controller.Write(RSTPin, PinValue.High);
+            resetPin = RSTPin;
             spi = spiDevice;
+        }
+
+        public void Reset()
+        {
+            controller.Write(resetPin, PinValue.High);
+            Thread.Sleep(200);
+            controller.Write(resetPin, PinValue.Low);
+            Thread.Sleep(100);
+            controller.Write(resetPin, PinValue.High);
+            Thread.Sleep(200);
+            waitForReady();
         }
 
         public void EnalbeDevice()
@@ -140,18 +171,24 @@ namespace WaveshareEInkDriver
             sendCommand(0x03);
         }
 
+        private DeviceInfo _info;
 
         public DeviceInfo GetDeviceInfo()
         {
-            sendCommand(0x0302);
-            var tmp = readData<DeviceInfoInternal>(true, null);
-            return new DeviceInfo()
+            if (_info==null)
             {
-                ScreenSize = new Size(tmp.Width, tmp.Height),
-                Version = tmp.Version,
-                LUTVersion = tmp.LUTVersion,
-                BufferAddress = (tmp.bufferAddressH << 16) + tmp.bufferAddressL
-            };
+                sendCommand(0x0302);
+                var tmp = readData<DeviceInfoInternal>(true, null);
+                _info= new DeviceInfo()
+                {
+                    ScreenSize = new Size(tmp.Width, tmp.Height),
+                    Version = tmp.Version,
+                    LUTVersion = tmp.LUTVersion,
+                    BufferAddress = (tmp.bufferAddressH << 16) + tmp.bufferAddressL
+                };
+            }
+            return _info;
+            
         }
         public void SetVCOM(ushort value)
         {
@@ -295,6 +332,7 @@ namespace WaveshareEInkDriver
 
         public void Display(short x, short y,short width,short height,short mode)
         {
+            waitForDisplayReady();
             DisplayInfo info;
             info.X = x;
             info.Y = y;
@@ -302,6 +340,21 @@ namespace WaveshareEInkDriver
             info.Height = height;
             info.Mode = mode;
             sendCommand(0x0034);
+            sendData(info);
+            waitForReady();
+        }
+
+        public void Display1(short x, short y, short width, short height, short mode,int address)
+        {
+            waitForDisplayReady();
+            DisplayWithAreaInfo info;
+            info.X = x;
+            info.Y = y;
+            info.Width = width;
+            info.Height = height;
+            info.Mode = mode;
+            info.address = address>>16 | address<<16;
+            sendCommand(0x0037);
             sendData(info);
             waitForReady();
         }
@@ -324,10 +377,7 @@ namespace WaveshareEInkDriver
                 size -= receiveSize;
                 //Console.WriteLine($"SPI Receive [{receiveBuffer.Length}]:{BitConverter.ToString(receiveBuffer.ToArray())}");
             }
-
             revertByteIfNeeded(buffer);
-
-
         }
 
         private T readData<T>(bool reverseWords, bool[] wordMask) where T : struct
@@ -364,6 +414,7 @@ namespace WaveshareEInkDriver
                 {
                     throw new InvalidOperationException("wait time out on SPI device");
                 }
+                Thread.Sleep(TimeSpan.FromTicks(100));
             }
         }
 
@@ -377,7 +428,31 @@ namespace WaveshareEInkDriver
                 {
                     throw new InvalidOperationException("wait display ready time out");
                 }
+                Thread.Sleep(TimeSpan.FromTicks(100));
             }
+        }
+        [StructLayout(LayoutKind.Explicit)]
+        struct MemoryOperate
+        {
+            [FieldOffset(0)]
+            public int Address;
+            [FieldOffset(4)]
+            public int Length;
+        }
+        public byte[] MemoryRead(int address,int size)
+        {
+            MemoryOperate mo;
+            mo.Address = address;
+            mo.Length = size;
+            sendCommand(0x12);
+            sendData(mo);
+
+            byte[] result = new byte[size*2];
+            sendData(0x13);
+            readData(result);
+
+            sendCommand(0x15);
+            return result;
         }
     }
 

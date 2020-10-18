@@ -9,8 +9,8 @@ namespace WaveshareEInkDriver
     public class SPIDebugOutputDevice:SpiDevice
     {
         SpiDevice spi;
-        
         public override SpiConnectionSettings ConnectionSettings => spi.ConnectionSettings;
+        public int MaxDumpDataSize { get; set; } = 100;
         public SPIDebugOutputDevice(SpiDevice spiDevice)
         {
             spi = spiDevice;
@@ -18,7 +18,19 @@ namespace WaveshareEInkDriver
         public override void Read(Span<byte> buffer)
         {
             spi.Read(buffer);
-            Trace.TraceInformation($"SPI Read[{buffer.Length}]:{BitConverter.ToString(buffer.ToArray())}");
+            Trace.TraceInformation(dumpBuffer("SPI READ",buffer));
+        }
+
+        private string dumpBuffer(string prefix, ReadOnlySpan<byte> buffer)
+        {
+            if ( buffer.Length<=MaxDumpDataSize)
+            {
+                return $"{prefix}[{buffer.Length}]:{BitConverter.ToString(buffer.ToArray())}";
+            }
+            else
+            {
+                return $"{prefix}[{buffer.Length}]:{BitConverter.ToString(buffer.Slice(0,10).ToArray())} ...";
+            }
         }
 
         public override byte ReadByte()
@@ -31,14 +43,14 @@ namespace WaveshareEInkDriver
         public override void TransferFullDuplex(ReadOnlySpan<byte> writeBuffer, Span<byte> readBuffer)
         {
             spi.TransferFullDuplex(writeBuffer, readBuffer);
-            Trace.TraceInformation($"SPI Duplex-Write[{writeBuffer.Length}]:{BitConverter.ToString(writeBuffer.ToArray())}");
-            Trace.TraceInformation($"SPI Duplex-Read[{readBuffer.Length}]:{BitConverter.ToString(readBuffer.ToArray())}");
+            Trace.TraceInformation(dumpBuffer("SPI Duplex - Write", writeBuffer));
+            Trace.TraceInformation(dumpBuffer("SPI Duplex - Read", readBuffer));
         }
 
         public override void Write(ReadOnlySpan<byte> buffer)
         {
             spi.Write(buffer);
-            Trace.TraceInformation($"SPI Write[{buffer.Length}]:{BitConverter.ToString(buffer.ToArray())}");
+            Trace.TraceInformation(dumpBuffer("SPI WRITE", buffer));
         }
 
         public override void WriteByte(byte value)
