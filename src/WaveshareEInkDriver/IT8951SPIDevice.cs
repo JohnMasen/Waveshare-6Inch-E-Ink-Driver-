@@ -412,7 +412,7 @@ namespace WaveshareEInkDriver
             {
                 if (sw.ElapsedMilliseconds > 1000)
                 {
-                    throw new InvalidOperationException("wait time out on SPI device");
+                    throw new InvalidOperationException("HRDY wait time out");
                 }
                 Thread.Sleep(TimeSpan.FromTicks(100));
             }
