@@ -48,21 +48,29 @@ namespace WaveshareEInkDriver
             int height = BinaryPrimitives.ReadUInt16BigEndian(buffer.Slice(2));
             int addL = BinaryPrimitives.ReadUInt16BigEndian(buffer.Slice(4));
             int addH = BinaryPrimitives.ReadUInt16BigEndian(buffer.Slice(6));
-            reverseWord(buffer.Slice(8, 32));
-            result.Version = System.Text.Encoding.ASCII.GetString(buffer.Slice(8, 16));
-            result.LUTVersion = System.Text.Encoding.ASCII.GetString(buffer.Slice(24, 16));
-            result.Version = result.Version.Replace("\0", string.Empty);
-            result.LUTVersion = result.LUTVersion.Replace("\0", string.Empty);
+            result.Version = readDeviceBigEndianString(buffer.Slice(8, 16));
+            result.LUTVersion = readDeviceBigEndianString(buffer.Slice(24, 16));
             result.ScreenSize = new Size(width, height);
             result.BufferAddress = addH << 16 | addL;
             return result;
         }
+
         private void reverseWord(Span<byte> data)
         {
             for (int i = 0; i < data.Length; i+=2)
             {
                 data.Slice(i, 2).Reverse();
             }
+        }
+        private string readDeviceBigEndianString(Span<byte> data)
+        {
+            //reverse byte order of words
+            for (int i = 0; i < data.Length; i += 2)
+            {
+                data.Slice(i, 2).Reverse();
+            }
+            var output = data.Slice(0, data.IndexOf(byte.MinValue));
+            return System.Text.Encoding.ASCII.GetString(output);
         }
     }
 
