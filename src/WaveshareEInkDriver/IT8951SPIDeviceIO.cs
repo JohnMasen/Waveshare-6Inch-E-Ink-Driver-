@@ -15,7 +15,7 @@ namespace WaveshareEInkDriver
     {
         private SpiDevice spi;
         private  byte[] cmdBuffer = { 0x60, 0x00,0x00,0x00 };
-        private  byte[] sendDataBuffer = { 0x11, 0x00, 0x00, 0x00 };
+        private  byte[] sendDataBuffer = { 0x00, 0x00, 0x00, 0x00 };
         public int MaxDumpDataSize { get; set; } = 100;
 
         private readonly int readyPin, resetPin;

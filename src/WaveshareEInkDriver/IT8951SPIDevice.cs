@@ -26,6 +26,7 @@ namespace WaveshareEInkDriver
 
     public class IT8951SPIDevice
     {
+
         readonly IT8951SPIDeviceIO io;
         public IT8951SPIDevice(IT8951SPIDeviceIO deviceIO)
         {
@@ -43,7 +44,7 @@ namespace WaveshareEInkDriver
             io.SendCommand(0x0302);
             Span<byte> buffer = stackalloc byte[40];
             io.ReadData(buffer);
-            DeviceInfo result= new DeviceInfo();
+            DeviceInfo result = new DeviceInfo();
             int width = BinaryPrimitives.ReadUInt16BigEndian(buffer);
             int height = BinaryPrimitives.ReadUInt16BigEndian(buffer.Slice(2));
             int addL = BinaryPrimitives.ReadUInt16BigEndian(buffer.Slice(4));
@@ -57,7 +58,7 @@ namespace WaveshareEInkDriver
 
         private void reverseWord(Span<byte> data)
         {
-            for (int i = 0; i < data.Length; i+=2)
+            for (int i = 0; i < data.Length; i += 2)
             {
                 data.Slice(i, 2).Reverse();
             }
@@ -71,6 +72,62 @@ namespace WaveshareEInkDriver
             }
             var output = data.Slice(0, data.IndexOf(byte.MinValue));
             return System.Text.Encoding.ASCII.GetString(output);
+        }
+        /// <summary>
+        /// Enable packed write
+        /// </summary>
+        public void EnablePackedWrite()
+        {
+            WriteRegister(0x04, 1);
+        }
+
+        public void SetTargetMemoryAddress(int address)
+        {
+            ushort LISAR = 0x2008;
+            ushort valueH = (ushort)((address >> 16) & 0x0000ffff);
+            ushort valueL = (ushort)(address & 0x0000ffff);
+            WriteRegister(LISAR, valueL);
+            WriteRegister((ushort)(LISAR + 2), valueH);
+        }
+
+        public ushort GetVCom()
+        {
+            io.SendCommand(0x0039, 0);
+            return io.ReadData();
+        }
+        public void SetVCom(float value)
+        {
+            ushort v = (ushort)(Math.Abs(value) * 1000);
+            io.SendCommand(0x0039, 1, v);
+        }
+
+        public ushort ReadRegister(ushort address)
+        {
+            io.SendCommand(0x0010);
+            io.SendData(address);
+            return io.ReadData();
+        }
+
+        public void WaitForDisplayReady(TimeSpan timeout)
+        {
+            Stopwatch sw = Stopwatch.StartNew();
+            while (ReadRegister(0x1224) != 0)
+            {
+                if (sw.Elapsed > timeout)
+                {
+                    throw new InvalidOperationException("Wait for display timed out");
+                }
+                Thread.Sleep(10);
+            }
+            sw.Stop();
+            Trace.TraceInformation($"Wait for display ready in {sw.ElapsedMilliseconds}ms");
+        }
+
+        public void WriteRegister(ushort address, ushort value)
+        {
+            io.SendCommand(0x0011);
+            io.SendData(address);
+            io.SendData(value);
         }
     }
 

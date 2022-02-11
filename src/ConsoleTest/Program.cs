@@ -5,6 +5,7 @@ using System;
 using System.Device.Gpio;
 using System.Device.Spi;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Threading;
 using WaveshareEInkDriver;
 
@@ -30,11 +31,19 @@ namespace ConsoleTest
                 device.Reset();
             }
 
-            Test1(device);
-            
+            ReadInfoTest(device);
+            RWRegisterTest(device);
+            RWVComTest(device);
             Console.WriteLine("done");
         }
-        private static void Test1(IT8951SPIDevice device)
+
+        private void standardTest(IT8951SPIDevice device)
+        {
+            device.Reset();
+            //device.EnablePackedWrite();
+            device.SetVCom(-1.91f);
+        }
+        private static void ReadInfoTest(IT8951SPIDevice device)
         {
 
             using (new Operation("Read DeviceInfo"))
@@ -43,6 +52,45 @@ namespace ConsoleTest
                 var s=System.Text.Json.JsonSerializer.Serialize(r);
                 Console.WriteLine(s);
             }
+        }
+        private static void RWRegisterTest(IT8951SPIDevice device)
+        {
+            using(new Operation("Write Register value=0"))
+            {
+                device.WriteRegister(0x04, 0);
+            }
+            using(new Operation("Read Register"))
+            {
+                DisplayRegister(device, 0x04);
+            }
+            using (new Operation("Write Register value=1"))
+            {
+                device.WriteRegister(0x04, 1);
+            }
+            using (new Operation("Read Register"))
+            {
+                DisplayRegister(device, 0x04);
+            }
+        }
+
+        private static void RWVComTest(IT8951SPIDevice device)
+        {
+            using (new Operation("GetVCom"))
+            {
+                Console.WriteLine($"VCom={device.GetVCom()}");
+            }
+            using (new Operation("SetVCom"))
+            {
+                device.SetVCom(-1.91f);
+            }
+            using (new Operation("GetVCom"))
+            {
+                Console.WriteLine($"VCom={device.GetVCom()}");
+            }
+        }
+        private static void DisplayRegister(IT8951SPIDevice device,ushort address)
+        {
+            Trace.TraceInformation($"Register 0x{address:X2}= {device.ReadRegister(address)}");
         }
 
     }
