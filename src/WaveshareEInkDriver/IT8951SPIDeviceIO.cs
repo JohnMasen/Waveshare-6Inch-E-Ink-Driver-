@@ -51,7 +51,7 @@ namespace WaveshareEInkDriver
                 Thread.Sleep(100);
             }
             sw.Stop();
-            Trace.TraceInformation($"Wait ready in {sw.ElapsedMilliseconds}ms");
+            //Trace.TraceInformation($"Wait ready in {sw.ElapsedMilliseconds}ms");
         }
 
         public void Reset()
@@ -74,7 +74,7 @@ namespace WaveshareEInkDriver
                 BinaryPrimitives.WriteUInt16BigEndian(cmdBuffer.AsSpan(2), cmd);
                 WaitReady();
                 spi.Write(cmdBuffer);
-                Trace.TraceInformation(dumpBuffer("SPI WRITE", cmdBuffer));
+                //Trace.TraceInformation(dumpBuffer("SPI WRITE", cmdBuffer));
                 foreach (var item in args)
                 {
                     SendData(item);
@@ -89,7 +89,7 @@ namespace WaveshareEInkDriver
                 BinaryPrimitives.WriteUInt16BigEndian(sendDataBuffer.AsSpan(2), data);
                 WaitReady();
                 spi.Write(sendDataBuffer);
-                Trace.TraceInformation(dumpBuffer("SPI WRITE", sendDataBuffer));
+                //Trace.TraceInformation(dumpBuffer("SPI WRITE", sendDataBuffer));
             }
         }
 
@@ -102,8 +102,8 @@ namespace WaveshareEInkDriver
             sendBuffer[0] = 0x10;
             WaitReady();
             spi.TransferFullDuplex(sendBuffer, receiveBuffer);
-            Trace.TraceInformation(dumpBuffer("SPI Duplex - Write", sendBuffer));
-            Trace.TraceInformation(dumpBuffer("SPI Duplex - Read", receiveBuffer));
+            //Trace.TraceInformation(dumpBuffer("SPI Duplex - Write", sendBuffer));
+            //Trace.TraceInformation(dumpBuffer("SPI Duplex - Read", receiveBuffer));
             receiveBuffer.Slice(4).CopyTo(resultBuffer);
         }
 
