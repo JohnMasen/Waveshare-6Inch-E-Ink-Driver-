@@ -5,6 +5,7 @@ using System;
 using System.Device.Gpio;
 using System.Device.Spi;
 using System.Diagnostics;
+using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -26,6 +27,8 @@ namespace ConsoleTest
             var device = new IT8951SPIDevice(new IT8951SPIDeviceIO(spi,readyPin: 24,resetPin: 17));
             System.Diagnostics.Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
             Console.WriteLine($"IsLittleEndian:{BitConverter.IsLittleEndian} ");
+            //Console.WriteLine("Waiting for debugger attach, press ENTER continue");
+            //Console.ReadLine();
             using (new Operation("Init"))
             {
                 device.Init();
@@ -34,7 +37,9 @@ namespace ConsoleTest
             RWRegisterTest(device);
             RWVComTest(device);
             testClearScreen(device);
-            testBlackScreen(device);
+            testdrawImage(device,"1200_825_02.jpg");
+            Console.WriteLine("Black screen set,Pree ENTER to continue");
+            Console.ReadLine();
             testClearScreen(device);
             Console.WriteLine("done");
         }
@@ -42,24 +47,54 @@ namespace ConsoleTest
         {
             using (new Operation("testClearScreen"))
             {
-                int bufferSizeX = (int)Math.Ceiling(device.DeviceInfo.ScreenSize.Width * 4.0d / 8); //imageWidth*4(Bits per pixel)/8(Bits per byte)
-                int bufferSizeY = device.DeviceInfo.ScreenSize.Height;
-                int bufferSize = bufferSizeX * bufferSizeY / 2;//buffer is ushort(2 byte) 
-                var buffer = new ushort[bufferSize].AsSpan();
-                buffer.Fill(0xffff);
-                displayBuffer(device, ImageEndianTypeEnum.LittleEndian, ImagePixelPackEnum.BPP4, ImageRotateEnum.Rotate0, DisplayModeEnum.INIT, buffer);
+                device.Draw(x =>
+                {
+                    x.Span.Fill(0xff);
+                }, mode: DisplayModeEnum.INIT);
+            }
+        }
+        private static void testdrawImage(IT8951SPIDevice device,string imagePath)
+        {
+            using (new Operation("testdrawImage"))
+            {
+                var img=Image.Load<L8>(imagePath);
+                if (img.Width!=device.DeviceInfo.ScreenSize.Width || img.Height!=device.DeviceInfo.ScreenSize.Height)
+                {
+                    img.Mutate(opt =>
+                    {
+                        ResizeOptions o = new ResizeOptions();
+                        o.Size = new Size(device.DeviceInfo.ScreenSize.Width,device.DeviceInfo.ScreenSize.Height);
+                        o.Mode = ResizeMode.Pad;
+                        opt.Resize(o);
+                    });
+                }
+                device.Draw(x =>
+                {
+                    img.ProcessPixelRows(acc =>
+                    {
+                        int index = 0;
+                        for (int i = 0; i < acc.Height; i++)
+                        {
+                            var rowBytes=acc.GetRowSpan(i);
+                            for (int j = 0; j < rowBytes.Length; j+=2)
+                            {
+                                byte output = (byte)((rowBytes[j].PackedValue / 16)<<4);
+                                output =(byte)( output | (byte)(rowBytes[j + 1].PackedValue / 16)) ;
+                                x.Span[index++] = output;
+                            }
+                        }
+                    });
+                });
             }
         }
         private static void testBlackScreen(IT8951SPIDevice device)
         {
             using (new Operation("testBlackScreen"))
             {
-                int bufferSizeX = (int)Math.Ceiling(device.DeviceInfo.ScreenSize.Width * 4.0d / 8); //imageWidth*4(Bits per pixel)/8(Bits per byte)
-                int bufferSizeY = device.DeviceInfo.ScreenSize.Height;
-                int bufferSize = bufferSizeX * bufferSizeY / 2;//buffer is ushort(2 byte) 
-                var buffer = new ushort[bufferSize].AsSpan();
-                buffer.Fill(0x0000);
-                displayBuffer(device, ImageEndianTypeEnum.LittleEndian, ImagePixelPackEnum.BPP4, ImageRotateEnum.Rotate0, DisplayModeEnum.GC16, buffer);
+                device.Draw(x =>
+                {
+                    x.Span.Fill(0x00);
+                });
             }
         }
         private static void displayBuffer(IT8951SPIDevice device,ImageEndianTypeEnum endian,ImagePixelPackEnum pixelPack,ImageRotateEnum rotate, DisplayModeEnum mode,Span<ushort> buffer)
@@ -67,22 +102,18 @@ namespace ConsoleTest
             device.WaitForDisplayReady(TimeSpan.FromSeconds(5));
             device.SetTargetMemoryAddress(device.DeviceInfo.BufferAddress);
             device.LoadImageStart(endian, pixelPack, rotate);
-            device.SendBuffer(buffer);
+            //device.SendBuffer(buffer);
+            device.SendBuffer(MemoryMarshal.AsBytes(buffer));
             device.LoadImageEnd();
             device.DisplayArea(0, 0, 800, 600, mode);
         }
-        private void standardTest(IT8951SPIDevice device)
-        {
-            device.Init();
-            //device.EnablePackedWrite();
-            device.SetVCom(-1.91f);
-        }
+        
         private static void ReadInfoTest(IT8951SPIDevice device)
         {
 
             using (new Operation("Read DeviceInfo"))
             {
-                var r = device.GetDeviceInfo();
+                var r = device.DeviceInfo;
                 var s=System.Text.Json.JsonSerializer.Serialize(r);
                 Console.WriteLine(s);
             }

@@ -58,11 +58,14 @@ namespace WaveshareEInkDriver
         {
             io = deviceIO;
         }
-
+        /// <summary>
+        /// Reset device and perform init settings
+        /// </summary>
+        /// <exception cref="InvalidOperationException"></exception>
         public void Init()
         {
             io.Reset();
-            io.SendCommand(0x01);
+            io.SendCommand(0x01);//enable device
             io.WaitReady();
             DeviceInfo = GetDeviceInfo();
             if (DeviceInfo.LUTVersion!="M641")
@@ -71,7 +74,11 @@ namespace WaveshareEInkDriver
             }
             EnablePackedWrite();
         }
-        public DeviceInfo GetDeviceInfo()
+        /// <summary>
+        /// Get Device Info
+        /// </summary>
+        /// <returns></returns>
+        private DeviceInfo GetDeviceInfo()
         {
             io.SendCommand(0x0302);
             Span<byte> buffer = stackalloc byte[40];
@@ -88,20 +95,6 @@ namespace WaveshareEInkDriver
             return result;
         }
 
-        private void reverseWord(Span<byte> data)
-        {
-            for (int i = 0; i < data.Length; i += 2)
-            {
-                data.Slice(i, 2).Reverse();
-            }
-        }
-        public void SendBuffer(Span<ushort>buffer)
-        {
-            for (int i = 0; i < buffer.Length; i++)
-            {
-                io.SendData(buffer[i]);
-            }
-        }
         public void DisplayArea(ushort x, ushort y, ushort width, ushort height,DisplayModeEnum mode)
         {
             io.SendCommand(0x0034, x, y, width, height, (ushort)mode);
@@ -136,6 +129,10 @@ namespace WaveshareEInkDriver
             ushort valueL = (ushort)(address & 0x0000ffff);
             WriteRegister((ushort)(LISAR + 2), valueH);
             WriteRegister(LISAR, valueL);
+        }
+        public void SendBuffer(Span<byte> buffer)
+        {
+            io.SendData(buffer);
         }
 
         public void LoadImageStart(ImageEndianTypeEnum endtype,ImagePixelPackEnum pixelPack,ImageRotateEnum rotate)

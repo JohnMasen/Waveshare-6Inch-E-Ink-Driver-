@@ -51,7 +51,7 @@ namespace WaveshareEInkDriver
                 Thread.Sleep(100);
             }
             sw.Stop();
-            //Trace.TraceInformation($"Wait ready in {sw.ElapsedMilliseconds}ms");
+            Trace.TraceInformation($"Wait ready in {sw.ElapsedMilliseconds}ms");
         }
 
         public void Reset()
@@ -74,7 +74,7 @@ namespace WaveshareEInkDriver
                 BinaryPrimitives.WriteUInt16BigEndian(cmdBuffer.AsSpan(2), cmd);
                 WaitReady();
                 spi.Write(cmdBuffer);
-                //Trace.TraceInformation(dumpBuffer("SPI WRITE", cmdBuffer));
+                Trace.TraceInformation(dumpBuffer("SPI WRITE", cmdBuffer));
                 foreach (var item in args)
                 {
                     SendData(item);
@@ -89,7 +89,52 @@ namespace WaveshareEInkDriver
                 BinaryPrimitives.WriteUInt16BigEndian(sendDataBuffer.AsSpan(2), data);
                 WaitReady();
                 spi.Write(sendDataBuffer);
-                //Trace.TraceInformation(dumpBuffer("SPI WRITE", sendDataBuffer));
+                Trace.TraceInformation(dumpBuffer("SPI WRITE", sendDataBuffer));
+            }
+        }
+
+        public void SendData(Span<byte> data,bool swapByteOrder=false,int sendBufferSize=2048)
+        {
+            if (data.Length==0)
+            {
+                throw new ArgumentOutOfRangeException("data size must not be 0");
+            }
+            if (data.Length%2!=0)
+            {
+                throw new ArgumentException("data size should be multiples of 2");
+            }
+            if (sendBufferSize<4 ||sendBufferSize>2048)
+            {
+                throw new ArgumentOutOfRangeException(nameof(sendBufferSize), "sendBufferSize must between 4 and 2048");
+            }
+            if (sendBufferSize%2!=0)
+            {
+                throw new ArgumentException(nameof(sendBufferSize), "sendBufferSize must be multiples of 2");
+            }
+            Span<byte> sendBuffer = stackalloc byte[sendBufferSize];
+            sendBuffer.Slice(0, 2).Fill(0);
+            int index = 0;
+            while (index<data.Length)
+            {
+                int sendSize = Math.Min(sendBufferSize-2, data.Length - index);//buffer size includes 2 bytes (0x00 0x00) prebeam
+                data.Slice(index, sendSize).CopyTo(sendBuffer.Slice(2));
+                if (swapByteOrder)
+                {
+                    swapDataByteOrder(sendBuffer, 2..);
+                }
+                WaitReady();
+                spi.Write(sendBuffer.Slice(0,sendSize + 2));
+                index += sendSize;
+            }
+            Trace.TraceInformation($"Batch data sent, size={data.Length}");
+        }
+
+        private void swapDataByteOrder(Span<byte> data,Range range)
+        {
+            var r = range.GetOffsetAndLength(data.Length);
+            for (int i = r.Offset; i < r.Length; i+=2)
+            {
+                data.Slice(i, 2).Reverse();
             }
         }
 
@@ -102,8 +147,8 @@ namespace WaveshareEInkDriver
             sendBuffer[0] = 0x10;
             WaitReady();
             spi.TransferFullDuplex(sendBuffer, receiveBuffer);
-            //Trace.TraceInformation(dumpBuffer("SPI Duplex - Write", sendBuffer));
-            //Trace.TraceInformation(dumpBuffer("SPI Duplex - Read", receiveBuffer));
+            Trace.TraceInformation(dumpBuffer("SPI Duplex - Write", sendBuffer));
+            Trace.TraceInformation(dumpBuffer("SPI Duplex - Read", receiveBuffer));
             receiveBuffer.Slice(4).CopyTo(resultBuffer);
         }
 
