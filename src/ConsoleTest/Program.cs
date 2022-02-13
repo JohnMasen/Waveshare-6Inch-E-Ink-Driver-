@@ -5,11 +5,13 @@ using System;
 using System.Device.Gpio;
 using System.Device.Spi;
 using System.Diagnostics;
+using System.IO;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using WaveshareEInkDriver;
+using static WaveshareEInkDriver.IT8951SPIDeviceExtension;
 
 namespace ConsoleTest
 {
@@ -36,24 +38,28 @@ namespace ConsoleTest
             ReadInfoTest(device);
             RWRegisterTest(device);
             RWVComTest(device);
-            testClearScreen(device);
-            testdrawImage(device,"1200_825_02.jpg");
-            Console.WriteLine("Black screen set,Pree ENTER to continue");
-            Console.ReadLine();
-            testClearScreen(device);
+            testClearScreen(device,true);
+            
+            foreach (var f in Directory.GetFiles("Images","*.jpg"))
+            {
+                testClearScreen(device, false);
+                testdrawImage(device, f,true);
+            }
+            testClearScreen(device,true);
             Console.WriteLine("done");
         }
-        private static void testClearScreen(IT8951SPIDevice device)
+
+        private static void testClearScreen(IT8951SPIDevice device,bool init=false)
         {
             using (new Operation("testClearScreen"))
             {
                 device.Draw(x =>
                 {
-                    x.Span.Fill(0xff);
-                }, mode: DisplayModeEnum.INIT);
+                    x.Buffer.Span.Fill(0xff);
+                }, mode: init? DisplayModeEnum.INIT:DisplayModeEnum.GC16);
             }
         }
-        private static void testdrawImage(IT8951SPIDevice device,string imagePath)
+        private static void testdrawImage(IT8951SPIDevice device,string imagePath,bool waitEnter=false)
         {
             using (new Operation("testdrawImage"))
             {
@@ -66,25 +72,38 @@ namespace ConsoleTest
                         o.Size = new Size(device.DeviceInfo.ScreenSize.Width,device.DeviceInfo.ScreenSize.Height);
                         o.Mode = ResizeMode.Pad;
                         opt.Resize(o);
+                        //Color[] palette = new Color[16];
+                        //for (int i = 0; i < palette.Length; i++)
+                        //{
+                        //    palette[i] = new Color(new L16((ushort)(i * 16)));
+                        //}
+                        //opt.Dither(KnownDitherings.FloydSteinberg, palette);
                     });
                 }
                 device.Draw(x =>
                 {
                     img.ProcessPixelRows(acc =>
                     {
-                        int index = 0;
+                        
                         for (int i = 0; i < acc.Height; i++)
                         {
                             var rowBytes=acc.GetRowSpan(i);
+                            var targetRow = PixelBuffer.GetRowBuffer(x, i);
+                            int index = 0;
                             for (int j = 0; j < rowBytes.Length; j+=2)
                             {
                                 byte output = (byte)((rowBytes[j].PackedValue / 16)<<4);
                                 output =(byte)( output | (byte)(rowBytes[j + 1].PackedValue / 16)) ;
-                                x.Span[index++] = output;
+                                targetRow.Span[index++] = output;
                             }
                         }
                     });
                 });
+                if (waitEnter)
+                {
+                    Console.WriteLine($"Image {imagePath} Ready, Press ENTER to continue");
+                    Console.ReadLine();
+                }
             }
         }
         private static void testBlackScreen(IT8951SPIDevice device)
@@ -93,7 +112,7 @@ namespace ConsoleTest
             {
                 device.Draw(x =>
                 {
-                    x.Span.Fill(0x00);
+                    x.Buffer.Span.Fill(0x00);
                 });
             }
         }
