@@ -26,6 +26,7 @@ namespace WaveshareEInkDriver
                     ImagePixelPackEnum.BPP3 => 2,
                     ImagePixelPackEnum.BPP4 => 2,
                     ImagePixelPackEnum.BPP8 => 1,
+                    ImagePixelPackEnum.BPP1 => 8,
                     _ => throw new ArgumentOutOfRangeException(nameof(bpp)),
                 };
                 LastByteFull = width % pixelPerByte == 0;
@@ -56,7 +57,15 @@ namespace WaveshareEInkDriver
 
         public static void RefreshScreen(this IT8951SPIDevice device, DisplayModeEnum mode)
         {
+            
             device.DisplayArea(0, 0, (ushort)device.DeviceInfo.ScreenSize.Width, (ushort)device.DeviceInfo.ScreenSize.Height, mode);
+        }
+
+        public static int ReadTemprature(this IT8951SPIDevice device)
+        {
+            ushort vH = device.ReadRegister(0x0802);
+            ushort vL = device.ReadRegister(0x0800);
+            return vH << 16 | vL;
         }
 
         public static void Draw(this IT8951SPIDevice device, Action<PixelBuffer> pixelOperateCallback, ImagePixelPackEnum bpp = ImagePixelPackEnum.BPP4, ImageEndianTypeEnum endian = ImageEndianTypeEnum.BigEndian, ImageRotateEnum rotate = ImageRotateEnum.Rotate0, DisplayModeEnum mode = DisplayModeEnum.GC16)

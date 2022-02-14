@@ -35,18 +35,24 @@ namespace ConsoleTest
             {
                 device.Init();
             }
+            ReadTempratureTest(device);
             ReadInfoTest(device);
             RWRegisterTest(device);
             RWVComTest(device);
-            testClearScreen(device,true);
-            
-            foreach (var f in Directory.GetFiles("Images","*.jpg"))
+            testClearScreen(device, true);
+
+            foreach (var f in Directory.GetFiles("Images"))
             {
                 testClearScreen(device, false);
-                testdrawImage(device, f,true);
+                testdrawImage(device, f, true);
             }
-            testClearScreen(device,true);
+            testClearScreen(device, true);
             Console.WriteLine("done");
+        }
+
+        private static void ReadTempratureTest(IT8951SPIDevice device)
+        {
+            Console.WriteLine($"Temprature={device.ReadTemprature()}");
         }
 
         private static void testClearScreen(IT8951SPIDevice device,bool init=false)
@@ -72,12 +78,12 @@ namespace ConsoleTest
                         o.Size = new Size(device.DeviceInfo.ScreenSize.Width,device.DeviceInfo.ScreenSize.Height);
                         o.Mode = ResizeMode.Pad;
                         opt.Resize(o);
-                        //Color[] palette = new Color[16];
-                        //for (int i = 0; i < palette.Length; i++)
-                        //{
-                        //    palette[i] = new Color(new L16((ushort)(i * 16)));
-                        //}
-                        //opt.Dither(KnownDitherings.FloydSteinberg, palette);
+                        Color[] palette = new Color[16];
+                        for (int i = 0; i < palette.Length; i++)
+                        {
+                            palette[i] = new Color(new L16((ushort)(i * 4096)));
+                        }
+                        opt.Dither(KnownDitherings.FloydSteinberg, palette);
                     });
                 }
                 device.Draw(x =>

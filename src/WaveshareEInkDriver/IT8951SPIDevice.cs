@@ -33,7 +33,8 @@ namespace WaveshareEInkDriver
         BPP2=0,
         BPP3=0b_0001_0000,
         BPP4=0b_0010_0000,
-        BPP8=0b_0011_0000
+        BPP8=0b_0011_0000,
+        BPP1=0b_1111_0000//special mode, need to handle this mode manually
     }
     public enum ImageRotateEnum : ushort
     {
@@ -54,9 +55,39 @@ namespace WaveshareEInkDriver
 
         readonly IT8951SPIDeviceIO io;
         public DeviceInfo DeviceInfo{ get; private set; }
+        public IT8951SPIDevice()
+        {
+            SpiConnectionSettings settings = new SpiConnectionSettings(0, 0);
+            settings.ClockFrequency = 12000000; //suggested 12MHZ in doc
+            settings.Mode = SpiMode.Mode0;
+            settings.ChipSelectLineActiveState = PinValue.Low;
+            settings.DataFlow = DataFlow.MsbFirst;
+            SpiDevice spi = SpiDevice.Create(settings);
+            io=new IT8951SPIDeviceIO(spi, 24, 17);
+        }
+        public IT8951SPIDevice(SpiDevice spi, int readyPin=24, int busyPin=17)
+        {
+            io = new IT8951SPIDeviceIO(spi, readyPin, busyPin);
+        }
         public IT8951SPIDevice(IT8951SPIDeviceIO deviceIO)
         {
             io = deviceIO;
+        }
+
+        public void Set1BPPMode(bool value)
+        {
+            ushort tmp = ReadRegister(0x1140);//18th bit of 0x1138 is 2nd bit of 0x1140 in MSBEndian
+            if (value)
+            {
+                tmp = (ushort)(0b_0000_0100 | tmp);//set 2nd bit value to 1
+                WriteRegister(0x1250, 0x00FF);//foreground=00 background=FF
+            }
+            else
+            {
+                tmp = (ushort)(0b_1111_1011 & tmp);//set 2nd bit value to 0
+            }
+            
+            WriteRegister(0x1138+2, tmp); //write back
         }
         /// <summary>
         /// Reset device and perform init settings
@@ -98,6 +129,10 @@ namespace WaveshareEInkDriver
         public void DisplayArea(ushort x, ushort y, ushort width, ushort height,DisplayModeEnum mode)
         {
             io.SendCommand(0x0034, x, y, width, height, (ushort)mode);
+        }
+        public void DisplayArea(ushort x, ushort y, ushort width, ushort height, DisplayModeEnum mode,int memoryAddress)
+        {
+            io.SendCommand(0x0037, x, y, width, height, (ushort)mode,(ushort)memoryAddress,(ushort)(memoryAddress>>16) );
         }
 
         public void LoadImageEnd()
