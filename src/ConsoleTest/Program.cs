@@ -41,15 +41,17 @@ namespace ConsoleTest
             RWVComTest(device);
             testClearScreen(device, true);
 
-            //foreach (var f in Directory.GetFiles("Images"))
-            //{
-            //    testClearScreen(device, false);
-            //    testdrawImage(device, f, true);
-            //}
+            foreach (var f in Directory.GetFiles("Images"))
+            {
+                testClearScreen(device, false);
+                testdrawImage(device, f, true);
+            }
 
             testClearScreen(device, false);
             testdrawImage(device, "Images/3.jpg");
-            testDrawPartial(device, "Images/4.jpg", new Rectangle(0, 0, 320, 300),true);
+            var area = new Rectangle(0, 0, 400, 300);
+            testClearArea(device,area);
+            testDrawPartial(device, "Images/ori.bmp", area,true);
             
             testClearScreen(device, true);
             Console.WriteLine("done");
@@ -92,8 +94,8 @@ namespace ConsoleTest
                             int index = 0;
                             for (int j = 0; j < rowBytes.Length; j += 2)
                             {
-                                byte output = (byte)((rowBytes[j].PackedValue / 16) << 4);
-                                output = (byte)(output | (byte)(rowBytes[j + 1].PackedValue / 16));
+                                byte output = (byte)(rowBytes[j].PackedValue & 0xf0);//from L8 to L4 is value/16(>>4), then make it high bits(<<4) which is AND 0xf0
+                                output = (byte)(output | (byte)(rowBytes[j + 1].PackedValue >>4));//second L4 bit value,output byte= 2nd value /16 | first L4 value
                                 targetRow.Span[index++] = output;
                             }
                         }
@@ -115,6 +117,16 @@ namespace ConsoleTest
                 {
                     x.Buffer.Span.Fill(0xff);
                 }, mode: init? DisplayModeEnum.INIT:DisplayModeEnum.GC16);
+            }
+        }
+        private static void testClearArea(IT8951SPIDevice device, Rectangle area)
+        {
+            using (new Operation("testClearScreen"))
+            {
+                device.DrawArea(x =>
+                {
+                    x.Buffer.Span.Fill(0xff);
+                },  (ushort)area.X,(ushort)area.Y,(ushort)area.Width,(ushort)area.Height);
             }
         }
         private static void testdrawImage(IT8951SPIDevice device,string imagePath,bool waitEnter=false)
