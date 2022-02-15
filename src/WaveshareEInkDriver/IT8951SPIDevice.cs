@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SixLabors.ImageSharp.ColorSpaces.Conversion;
+using System;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Data;
@@ -50,6 +51,8 @@ namespace WaveshareEInkDriver
         GC16=2,
         A2=4
     }
+
+    
     public class IT8951SPIDevice
     {
 
@@ -80,7 +83,7 @@ namespace WaveshareEInkDriver
             if (value)
             {
                 tmp = (ushort)(0b_0000_0100 | tmp);//set 2nd bit value to 1
-                WriteRegister(0x1250, 0x00FF);//foreground=00 background=FF
+                WriteRegister(0x1250, 0x00F0);//foreground=G0(0x00 Black) background=G15(0xF0 White)
             }
             else
             {
@@ -96,7 +99,7 @@ namespace WaveshareEInkDriver
         public void Init()
         {
             io.Reset();
-            io.SendCommand(0x01);//enable device
+            io.SendCommand(IT8951SPIDeviceIO.DeviceCommand.SYSN_RUN);//enable device
             io.WaitReady();
             DeviceInfo = GetDeviceInfo();
             if (DeviceInfo.LUTVersion!="M641")
@@ -111,7 +114,7 @@ namespace WaveshareEInkDriver
         /// <returns></returns>
         private DeviceInfo GetDeviceInfo()
         {
-            io.SendCommand(0x0302);
+            io.SendCommand(IT8951SPIDeviceIO.DeviceCommand.GET_DEV_INFO);
             Span<byte> buffer = stackalloc byte[40];
             io.ReadData(buffer);
             DeviceInfo result = new DeviceInfo();
@@ -128,16 +131,24 @@ namespace WaveshareEInkDriver
 
         public void DisplayArea(ushort x, ushort y, ushort width, ushort height,DisplayModeEnum mode)
         {
-            io.SendCommand(0x0034, x, y, width, height, (ushort)mode);
+            io.SendCommand(IT8951SPIDeviceIO.DeviceCommand.DPY_AREA, x, y, width, height, (ushort)mode);
         }
         public void DisplayArea(ushort x, ushort y, ushort width, ushort height, DisplayModeEnum mode,int memoryAddress)
         {
-            io.SendCommand(0x0037, x, y, width, height, (ushort)mode,(ushort)memoryAddress,(ushort)(memoryAddress>>16) );
+            io.SendCommand(IT8951SPIDeviceIO.DeviceCommand.DPY_BUF_AREA, x, y, width, height, (ushort)mode,(ushort)memoryAddress,(ushort)(memoryAddress>>16) );
+        }
+
+        public (ushort user,ushort system) GetTemprature()
+        {
+            io.SendCommand(IT8951SPIDeviceIO.DeviceCommand.TEMPERATURE_RW, 0);
+            ushort u =io.ReadData();
+            ushort s = io.ReadData();
+            return (user: u, system: s);
         }
 
         public void LoadImageEnd()
         {
-            io.SendCommand(0x0022);
+            io.SendCommand(IT8951SPIDeviceIO.DeviceCommand.LD_IMG_END);
         }
         private string readDeviceBigEndianString(Span<byte> data)
         {
@@ -173,22 +184,28 @@ namespace WaveshareEInkDriver
         public void LoadImageStart(ImageEndianTypeEnum endtype,ImagePixelPackEnum pixelPack,ImageRotateEnum rotate)
         {
             ushort v = (ushort)((ushort)endtype | (ushort)pixelPack | (ushort)rotate);
-            io.SendCommand(0x0020,v);
+            io.SendCommand(IT8951SPIDeviceIO.DeviceCommand.LD_IMG, v);
+        }
+
+        public void LoadImageAreaStart(ImageEndianTypeEnum endtype, ImagePixelPackEnum pixelPack, ImageRotateEnum rotate,ushort x,ushort y,ushort width,ushort height)
+        {
+            ushort v = (ushort)((ushort)endtype | (ushort)pixelPack | (ushort)rotate);
+            io.SendCommand(IT8951SPIDeviceIO.DeviceCommand.LD_IMG_AREA, v,x,y,width,height);
         }
         public ushort GetVCom()
         {
-            io.SendCommand(0x0039, 0);
+            io.SendCommand(IT8951SPIDeviceIO.DeviceCommand.VCOM_RW, 0);
             return io.ReadData();
         }
         public void SetVCom(float value)
         {
             ushort v = (ushort)(Math.Abs(value) * 1000);
-            io.SendCommand(0x0039, 1, v);
+            io.SendCommand(IT8951SPIDeviceIO.DeviceCommand.VCOM_RW, 1, v);
         }
 
         public ushort ReadRegister(ushort address)
         {
-            io.SendCommand(0x0010);
+            io.SendCommand(IT8951SPIDeviceIO.DeviceCommand.REG_RD);
             io.SendData(address);
             return io.ReadData();
         }
@@ -210,7 +227,7 @@ namespace WaveshareEInkDriver
 
         public void WriteRegister(ushort address, ushort value)
         {
-            io.SendCommand(0x0011);
+            io.SendCommand(IT8951SPIDeviceIO.DeviceCommand.REG_WR);
             io.SendData(address);
             io.SendData(value);
         }

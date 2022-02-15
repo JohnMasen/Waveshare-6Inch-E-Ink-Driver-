@@ -13,6 +13,26 @@ namespace WaveshareEInkDriver
 {
     public class IT8951SPIDeviceIO
     {
+        public enum DeviceCommand : ushort
+        {
+            SYSN_RUN = 0x01,
+            SLEEP = 0x03,
+            REG_RD = 0x10,
+            REG_WR = 0x11,
+            MEM_BST_RD_T = 0x12,
+            MEM_BST_RD_S = 0x13,
+            MEM_BST_WR = 0x14,
+            MEM_BST_END = 0x15,
+            LD_IMG = 0x20,
+            LD_IMG_AREA = 0x21,
+            LD_IMG_END = 0x22,
+            GET_DEV_INFO = 0x0302,
+            DPY_AREA = 0x34,
+            DPY_BUF_AREA=0x37,
+            PWD_ON_OFF_SEQ = 0x38,
+            VCOM_RW = 0x39,
+            TEMPERATURE_RW = 0x40   
+        }
         private SpiDevice spi;
         private  byte[] cmdBuffer = { 0x60, 0x00,0x00,0x00 };
         private  byte[] sendDataBuffer = { 0x00, 0x00, 0x00, 0x00 };
@@ -66,12 +86,12 @@ namespace WaveshareEInkDriver
         }
 
 
-        public void SendCommand(ushort cmd,params ushort[] args)
+        public void SendCommand(DeviceCommand cmd,params ushort[] args)
         {
             
             lock (syncRoot)
             {
-                BinaryPrimitives.WriteUInt16BigEndian(cmdBuffer.AsSpan(2), cmd);
+                BinaryPrimitives.WriteUInt16BigEndian(cmdBuffer.AsSpan(2), (ushort)cmd);
                 WaitReady();
                 spi.Write(cmdBuffer);
                 Trace.TraceInformation(dumpBuffer("SPI WRITE", cmdBuffer));

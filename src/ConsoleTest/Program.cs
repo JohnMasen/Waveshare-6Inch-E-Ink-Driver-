@@ -41,18 +41,70 @@ namespace ConsoleTest
             RWVComTest(device);
             testClearScreen(device, true);
 
-            foreach (var f in Directory.GetFiles("Images"))
-            {
-                testClearScreen(device, false);
-                testdrawImage(device, f, true);
-            }
+            //foreach (var f in Directory.GetFiles("Images"))
+            //{
+            //    testClearScreen(device, false);
+            //    testdrawImage(device, f, true);
+            //}
+
+            testClearScreen(device, false);
+            testdrawImage(device, "Images/3.jpg");
+            testDrawPartial(device, "Images/4.jpg", new Rectangle(0, 0, 320, 300),true);
+            
             testClearScreen(device, true);
             Console.WriteLine("done");
         }
 
         private static void ReadTempratureTest(IT8951SPIDevice device)
         {
-            Console.WriteLine($"Temprature={device.ReadTemprature()}");
+            var data = device.GetTemprature();
+            Console.WriteLine($"Temprature User={data.user},System={data.system}");
+        }
+
+        private static void testDrawPartial(IT8951SPIDevice device,string imagePath,Rectangle area,bool waitEnter=false)
+        {
+            using (new Operation($"Test draw partial"))
+            {
+                var img = Image.Load<L8>(imagePath);
+
+                img.Mutate(opt =>
+                {
+                    ResizeOptions o = new ResizeOptions();
+                    o.Size = new Size(area.Width, area.Height);
+                    o.Mode = ResizeMode.Pad;
+                    opt.Resize(o);
+                    Color[] palette = new Color[16];
+                    for (int i = 0; i < palette.Length; i++)
+                    {
+                        palette[i] = new Color(new L16((ushort)(i * 4096)));
+                    }
+                    opt.Dither(KnownDitherings.FloydSteinberg, palette);
+                });
+                device.DrawArea(x =>
+                {
+                    img.ProcessPixelRows(acc =>
+                    {
+
+                        for (int i = 0; i < acc.Height; i++)
+                        {
+                            var rowBytes = acc.GetRowSpan(i);
+                            var targetRow = PixelBuffer.GetRowBuffer(x, i);
+                            int index = 0;
+                            for (int j = 0; j < rowBytes.Length; j += 2)
+                            {
+                                byte output = (byte)((rowBytes[j].PackedValue / 16) << 4);
+                                output = (byte)(output | (byte)(rowBytes[j + 1].PackedValue / 16));
+                                targetRow.Span[index++] = output;
+                            }
+                        }
+                    });
+                }, (ushort)area.X, (ushort)area.Y, (ushort)area.Width, (ushort)area.Height);
+                if (waitEnter)
+                {
+                    Console.WriteLine("Partial update complete, Press ENTER to continue");
+                    Console.ReadLine();
+                }
+            }
         }
 
         private static void testClearScreen(IT8951SPIDevice device,bool init=false)

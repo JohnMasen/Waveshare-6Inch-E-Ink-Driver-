@@ -42,8 +42,11 @@ namespace WaveshareEInkDriver
 
 
         public static PixelBuffer PrepareBuffer(this IT8951SPIDevice device, ImagePixelPackEnum bpp)
+            => PrepareBuffer(device, bpp, device.DeviceInfo.ScreenSize.Width, device.DeviceInfo.ScreenSize.Height);
+      
+        public static PixelBuffer PrepareBuffer(this IT8951SPIDevice device, ImagePixelPackEnum bpp,int width,int height)
         {
-            return new PixelBuffer(device.DeviceInfo.ScreenSize.Width, device.DeviceInfo.ScreenSize.Height, bpp);
+            return new PixelBuffer(width, height, bpp);
         }
 
         public static void LoadImage(this IT8951SPIDevice device, ImagePixelPackEnum bpp, ImageEndianTypeEnum endian, ImageRotateEnum rotate, Span<byte> pixelBuffer)
@@ -54,19 +57,23 @@ namespace WaveshareEInkDriver
             device.SendBuffer(pixelBuffer);
             device.LoadImageEnd();
         }
+        public static void LoadImageArea(this IT8951SPIDevice device, ImagePixelPackEnum bpp, ImageEndianTypeEnum endian, ImageRotateEnum rotate, Span<byte> pixelBuffer,ushort x,ushort y,ushort width,ushort height)
+        {
+            device.WaitForDisplayReady(TimeSpan.FromSeconds(5));
+            device.SetTargetMemoryAddress(device.DeviceInfo.BufferAddress);
+            device.LoadImageAreaStart(endian, bpp, rotate,x,y,width,height);
+            device.SendBuffer(pixelBuffer);
+            device.LoadImageEnd();
+        }
 
         public static void RefreshScreen(this IT8951SPIDevice device, DisplayModeEnum mode)
+            => device.DisplayArea(0, 0, (ushort)device.DeviceInfo.ScreenSize.Width, (ushort)device.DeviceInfo.ScreenSize.Height, mode);
+
+        public static void RefreshArea(this IT8951SPIDevice device,DisplayModeEnum mode,ushort x,ushort y,ushort width,ushort height)
         {
-            
-            device.DisplayArea(0, 0, (ushort)device.DeviceInfo.ScreenSize.Width, (ushort)device.DeviceInfo.ScreenSize.Height, mode);
+            device.DisplayArea(x, y, width, height, mode);
         }
 
-        public static int ReadTemprature(this IT8951SPIDevice device)
-        {
-            ushort vH = device.ReadRegister(0x0802);
-            ushort vL = device.ReadRegister(0x0800);
-            return vH << 16 | vL;
-        }
 
         public static void Draw(this IT8951SPIDevice device, Action<PixelBuffer> pixelOperateCallback, ImagePixelPackEnum bpp = ImagePixelPackEnum.BPP4, ImageEndianTypeEnum endian = ImageEndianTypeEnum.BigEndian, ImageRotateEnum rotate = ImageRotateEnum.Rotate0, DisplayModeEnum mode = DisplayModeEnum.GC16)
         {
@@ -74,6 +81,14 @@ namespace WaveshareEInkDriver
             pixelOperateCallback(p);
             device.LoadImage(bpp, endian, rotate, p.Buffer.Span);
             device.RefreshScreen(mode);
+        }
+
+        public static void DrawArea(this IT8951SPIDevice device, Action<PixelBuffer> pixelOperateCallback,ushort x,ushort y,ushort width,ushort height, ImagePixelPackEnum bpp = ImagePixelPackEnum.BPP4, ImageEndianTypeEnum endian = ImageEndianTypeEnum.BigEndian, ImageRotateEnum rotate = ImageRotateEnum.Rotate0, DisplayModeEnum mode = DisplayModeEnum.GC16)
+        {
+            var p = device.PrepareBuffer(bpp,width,height);
+            pixelOperateCallback(p);
+            device.LoadImageArea(bpp, endian, rotate, p.Buffer.Span,x,y,width,height);
+            device.RefreshArea(mode,x,y,height,width);
         }
     }
 }
