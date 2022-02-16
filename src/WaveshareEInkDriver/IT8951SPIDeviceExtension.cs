@@ -10,17 +10,20 @@ namespace WaveshareEInkDriver
         public struct PixelBuffer
         {
             public readonly Memory<byte> Buffer;
-            public int LastBytePixels;
-            public bool LastByteFull;
             public ImagePixelPackEnum Bpp;
+            public readonly int BitsPerPixel;
+            public readonly int PixelPerByte;
+            public readonly int GapLeft;
+            public readonly int GapRight;
+            public readonly int PixelAlignmentWidth;
             /// <summary>
             /// Buffer size in pixel for each line
             /// </summary>
             public int Stride;
-            public PixelBuffer(int width, int height, ImagePixelPackEnum bpp)
+            public PixelBuffer(int x, int y, int width, int height, ImagePixelPackEnum bpp)
             {
                 Bpp = bpp;
-                int pixelPerByte = bpp switch
+                PixelPerByte = bpp switch
                 {
                     ImagePixelPackEnum.BPP2 => 4,
                     ImagePixelPackEnum.BPP3 => 2,
@@ -29,24 +32,47 @@ namespace WaveshareEInkDriver
                     ImagePixelPackEnum.BPP1 => 8,
                     _ => throw new ArgumentOutOfRangeException(nameof(bpp)),
                 };
-                LastByteFull = width % pixelPerByte == 0;
-                Stride = width / pixelPerByte + (LastByteFull ? 0 : 1);
-                LastBytePixels = LastByteFull ? pixelPerByte : width % pixelPerByte;
+                BitsPerPixel = bpp switch
+                {
+                    ImagePixelPackEnum.BPP2 => 2,
+                    ImagePixelPackEnum.BPP3 => 4,
+                    ImagePixelPackEnum.BPP4 => 4,
+                    ImagePixelPackEnum.BPP8 => 8,
+                    ImagePixelPackEnum.BPP1 => 1,
+                    _ => throw new ArgumentOutOfRangeException(nameof(bpp)),
+                };
+                PixelAlignmentWidth = bpp switch
+                {
+                    ImagePixelPackEnum.BPP2 => 16,
+                    ImagePixelPackEnum.BPP3 => 16,
+                    ImagePixelPackEnum.BPP4 => 16,
+                    ImagePixelPackEnum.BPP8 => 16,
+                    ImagePixelPackEnum.BPP1 => 32,
+                    _ => throw new ArgumentOutOfRangeException(nameof(bpp))
+                };
+                int x1 = x;
+                int x2 = x1 + width;
+
+                int pixelsPerPack = PixelAlignmentWidth / BitsPerPixel;
+                GapLeft = x1 % pixelsPerPack;
+                GapRight = x2 % pixelsPerPack == 0 ? 0 : pixelsPerPack - x2 % pixelsPerPack;
+
+                Stride = (width + GapLeft + GapRight) / PixelPerByte;
                 Buffer = new byte[Stride * height].AsMemory();
             }
             public static Memory<byte> GetRowBuffer(PixelBuffer pixelBuffer, int row)
             {
-                return pixelBuffer.Buffer.Slice(pixelBuffer.Stride * row);
+                return pixelBuffer.Buffer.Slice(pixelBuffer.Stride * row,pixelBuffer.Stride);
             }
         }
 
 
         public static PixelBuffer PrepareBuffer(this IT8951SPIDevice device, ImagePixelPackEnum bpp)
-            => PrepareBuffer(device, bpp, device.DeviceInfo.ScreenSize.Width, device.DeviceInfo.ScreenSize.Height);
-      
-        public static PixelBuffer PrepareBuffer(this IT8951SPIDevice device, ImagePixelPackEnum bpp,int width,int height)
+            => PrepareBuffer(device, bpp, 0, 0, device.DeviceInfo.ScreenSize.Width, device.DeviceInfo.ScreenSize.Height);
+
+        public static PixelBuffer PrepareBuffer(this IT8951SPIDevice device, ImagePixelPackEnum bpp, int x, int y, int width, int height)
         {
-            return new PixelBuffer(width, height, bpp);
+            return new PixelBuffer(x, y, width, height, bpp);
         }
 
         public static void LoadImage(this IT8951SPIDevice device, ImagePixelPackEnum bpp, ImageEndianTypeEnum endian, ImageRotateEnum rotate, Span<byte> pixelBuffer)
@@ -57,11 +83,11 @@ namespace WaveshareEInkDriver
             device.SendBuffer(pixelBuffer);
             device.LoadImageEnd();
         }
-        public static void LoadImageArea(this IT8951SPIDevice device, ImagePixelPackEnum bpp, ImageEndianTypeEnum endian, ImageRotateEnum rotate, Span<byte> pixelBuffer,ushort x,ushort y,ushort width,ushort height)
+        public static void LoadImageArea(this IT8951SPIDevice device, ImagePixelPackEnum bpp, ImageEndianTypeEnum endian, ImageRotateEnum rotate, Span<byte> pixelBuffer, ushort x, ushort y, ushort width, ushort height)
         {
             device.WaitForDisplayReady(TimeSpan.FromSeconds(5));
             device.SetTargetMemoryAddress(device.DeviceInfo.BufferAddress);
-            device.LoadImageAreaStart(endian, bpp, rotate,x,y,width,height);
+            device.LoadImageAreaStart(endian, bpp, rotate, x, y, width, height);
             device.SendBuffer(pixelBuffer);
             device.LoadImageEnd();
         }
@@ -69,7 +95,7 @@ namespace WaveshareEInkDriver
         public static void RefreshScreen(this IT8951SPIDevice device, DisplayModeEnum mode)
             => device.DisplayArea(0, 0, (ushort)device.DeviceInfo.ScreenSize.Width, (ushort)device.DeviceInfo.ScreenSize.Height, mode);
 
-        public static void RefreshArea(this IT8951SPIDevice device,DisplayModeEnum mode,ushort x,ushort y,ushort width,ushort height)
+        public static void RefreshArea(this IT8951SPIDevice device, DisplayModeEnum mode, ushort x, ushort y, ushort width, ushort height)
         {
             device.DisplayArea(x, y, width, height, mode);
         }
@@ -83,12 +109,12 @@ namespace WaveshareEInkDriver
             device.RefreshScreen(mode);
         }
 
-        public static void DrawArea(this IT8951SPIDevice device, Action<PixelBuffer> pixelOperateCallback,ushort x,ushort y,ushort width,ushort height, ImagePixelPackEnum bpp = ImagePixelPackEnum.BPP4, ImageEndianTypeEnum endian = ImageEndianTypeEnum.BigEndian, ImageRotateEnum rotate = ImageRotateEnum.Rotate0, DisplayModeEnum mode = DisplayModeEnum.GC16)
+        public static void DrawArea(this IT8951SPIDevice device, Action<PixelBuffer> pixelOperateCallback, ushort x, ushort y, ushort width, ushort height, ImagePixelPackEnum bpp = ImagePixelPackEnum.BPP4, ImageEndianTypeEnum endian = ImageEndianTypeEnum.BigEndian, ImageRotateEnum rotate = ImageRotateEnum.Rotate0, DisplayModeEnum mode = DisplayModeEnum.GC16)
         {
-            var p = device.PrepareBuffer(bpp,width,height);
+            var p = device.PrepareBuffer(bpp, x, y, width, height);
             pixelOperateCallback(p);
-            device.LoadImageArea(bpp, endian, rotate, p.Buffer.Span,x,y,width,height);
-            device.RefreshArea(mode,x,y,height,width);
+            device.LoadImageArea(bpp, endian, rotate, p.Buffer.Span, x, y, width, height);
+            device.RefreshArea(mode, x, y, width, height);
         }
     }
 }

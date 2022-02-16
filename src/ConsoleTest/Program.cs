@@ -19,6 +19,8 @@ namespace ConsoleTest
     {
         static void Main(string[] args)
         {
+            var pp = new IT8951SPIDeviceExtension.PixelBuffer(0, 0, 800, 600, ImagePixelPackEnum.BPP4);
+
             SpiConnectionSettings settings = new SpiConnectionSettings(0,0);
             settings.ClockFrequency = 12000000; //suggested 12MHZ in doc
             settings.Mode = SpiMode.Mode0;
@@ -41,17 +43,21 @@ namespace ConsoleTest
             RWVComTest(device);
             testClearScreen(device, true);
 
-            foreach (var f in Directory.GetFiles("Images"))
-            {
-                testClearScreen(device, false);
-                testdrawImage(device, f, true);
-            }
+            //foreach (var f in Directory.GetFiles("Images"))
+            //{
+            //    testClearScreen(device, false);
+            //    testdrawImage(device, f, true);
+            //}
 
             testClearScreen(device, false);
             testdrawImage(device, "Images/3.jpg");
-            var area = new Rectangle(0, 0, 400, 300);
-            testClearArea(device,area);
-            testDrawPartial(device, "Images/ori.bmp", area,true);
+            for (int i = 100; i < 601; i+=100)
+            {
+                var area = new Rectangle(0, 0, i, i*3/4);
+                testClearArea(device, area);
+                testDrawPartial(device, "Images/4.jpg", area, true);
+            }
+            
             
             testClearScreen(device, true);
             Console.WriteLine("done");
