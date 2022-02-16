@@ -10,6 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\WaveshareEInkDriver.ImageSharp\WaveshareEInkDriver.ImageSharp.csproj" />
     <ProjectReference Include="..\WaveshareEInkDriver\WaveshareEInkDriver.csproj" />
   </ItemGroup>
 
@@ -28,6 +29,12 @@
     </None>
     <None Update="Images\t1.bmp">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Images\t2.bmp">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Images\t3.bmp">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 

@@ -82,7 +82,7 @@ namespace WaveshareEInkDriver
             ushort tmp = ReadRegister(0x1140);//18th bit of 0x1138 is 2nd bit of 0x1140 in MSBEndian
             if (value)
             {
-                tmp = (ushort)(0b_0000_0100 | tmp);//set 2nd bit value to 1
+                tmp = (ushort)(0b_0000_0100 | tmp);//set 2nd bit value to 1 (MSBEndian)
                 WriteRegister(0x1250, 0x00F0);//foreground=G0(0x00 Black) background=G15(0xF0 White)
             }
             else
@@ -90,7 +90,7 @@ namespace WaveshareEInkDriver
                 tmp = (ushort)(0b_1111_1011 & tmp);//set 2nd bit value to 0
             }
             
-            WriteRegister(0x1138+2, tmp); //write back
+            WriteRegister(0x1140, tmp); //write back
         }
         /// <summary>
         /// Reset device and perform init settings
@@ -157,7 +157,7 @@ namespace WaveshareEInkDriver
             {
                 data.Slice(i, 2).Reverse();
             }
-            var output = data.Slice(0, data.IndexOf(byte.MinValue));
+            var output = data.Slice(0, data.IndexOf(byte.MinValue));//unix string ends with char(0)
             return System.Text.Encoding.ASCII.GetString(output);
         }
         /// <summary>
