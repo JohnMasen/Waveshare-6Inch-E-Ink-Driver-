@@ -18,6 +18,10 @@ namespace WaveshareEInkDriver
         /// <param name="displayMode">Display mode, GC16=16 level greyscale, A2=Balck and White</param>
         public static void Draw(this IT8951SPIDevice device,Image<L8> image,bool dither=true, bool autoResize=true, ImagePixelPackEnum bpp = ImagePixelPackEnum.BPP4,DisplayModeEnum displayMode=DisplayModeEnum.GC16)
         {
+            if (displayMode==DisplayModeEnum.INIT)
+            {
+                throw new ArgumentOutOfRangeException(nameof(displayMode), "displayMode can't be INIT while drawing image");
+            }
             if (device.DeviceInfo.ScreenSize.Width!=image.Width || device.DeviceInfo.ScreenSize.Height!=image.Height)
             {
                 if (!autoResize)
@@ -36,18 +40,47 @@ namespace WaveshareEInkDriver
                 }
             }
             var p = device.PrepareBuffer(bpp);
-            if (dither && bpp==ImagePixelPackEnum.BPP4)
+            if (dither)
             {
-                image.Mutate(opt =>
+                switch (bpp)
                 {
-                    //TODO: only works for 4 bit grey scale,should fix it
-                    Color[] palette = new Color[16];
-                    for (int i = 0; i < palette.Length; i++)
-                    {
-                        palette[i] = new Color(new L16((ushort)(i * 4096)));
-                    }
-                    opt.Dither(KnownDitherings.FloydSteinberg, palette);
-                });
+                    case ImagePixelPackEnum.BPP2:
+                        image.Mutate(opt =>
+                        {
+                            Color[] palette = new Color[4];
+                            for (int i = 0; i < palette.Length; i++)
+                            {
+                                palette[i] = new Color(new L16((ushort)(i * 16384)));
+                            }
+                            opt.Dither(KnownDitherings.FloydSteinberg,palette);
+                        });
+                        break;
+                    case ImagePixelPackEnum.BPP3:
+                        throw new NotImplementedException();
+                        break;
+                    case ImagePixelPackEnum.BPP4: //maximum grey scale is 16 levels
+                    case ImagePixelPackEnum.BPP8: //BPP8=BPP4, 4 lower bits are ignored
+                        image.Mutate(opt =>
+                        {
+                            Color[] palette = new Color[16];
+                            for (int i = 0; i < palette.Length; i++)
+                            {
+                                palette[i] = new Color(new L16((ushort)(i * 4096)));
+                            }
+                            opt.Dither(KnownDitherings.FloydSteinberg, palette);
+                        });
+                        break;
+                    case ImagePixelPackEnum.BPP1:
+                        image.Mutate(opt =>
+                        {
+                            opt.BinaryDither(KnownDitherings.FloydSteinberg);
+                        });
+                        break;
+                    default:
+                        break;
+                }
+
+                
             }
             image.ProcessPixelRows(acc =>
             {
@@ -59,6 +92,7 @@ namespace WaveshareEInkDriver
                     setDeviceStride(rowBytes, targetRow, p.PixelPerByte, p.GapLeft, p.GapRight, image.Width);
                 }
             });
+            device.Set1BPPMode(bpp == ImagePixelPackEnum.BPP1);
             device.LoadImage(bpp, ImageEndianTypeEnum.BigEndian, ImageRotateEnum.Rotate0, p.Buffer.Span);
             device.RefreshScreen(displayMode);
         }

@@ -20,7 +20,7 @@ namespace ConsoleTest
     {
         static void Main(string[] args)
         {
-            var pp = new IT8951SPIDeviceExtension.PixelBuffer(0, 0, 800, 600, ImagePixelPackEnum.BPP4);
+            //var pp = new IT8951SPIDeviceExtension.PixelBuffer(0, 0, 800, 600, ImagePixelPackEnum.BPP1);
 
             SpiConnectionSettings settings = new SpiConnectionSettings(0, 0);
             settings.ClockFrequency = 12000000; //suggested 12MHZ in doc
@@ -42,16 +42,18 @@ namespace ConsoleTest
             ReadInfoTest(device);
             RWRegisterTest(device);
             RWVComTest(device);
-            testClearScreen(device, true);
+            testClearScreen(device, DisplayModeEnum.INIT);
             //specialTest(device, "Images/t1.bmp", true);
             foreach (var f in Directory.GetFiles("Images"))
             {
-                testClearScreen(device, false);
-                testdrawImage(device, f, true);
+                testClearScreen(device);
+                testdrawImage(device, f,true);
                 //testClearScreen(device, false);
                 //testDrawPartial(device, f, new Rectangle(0, 0, 800, 600), true);
                 //testClearScreen(device, false);
                 //specialTest(device, f, true);
+                //testClearScreen(device, DisplayModeEnum.A2);
+                //testDrawPartial(device, f, new Rectangle(0, 0, 800, 600), true, DisplayModeEnum.A2);
             }
 
             //testClearScreen(device, false);
@@ -64,7 +66,7 @@ namespace ConsoleTest
             //}
 
 
-            testClearScreen(device, true);
+            testClearScreen(device, DisplayModeEnum.INIT);
             Console.WriteLine("done");
         }
 
@@ -128,7 +130,7 @@ namespace ConsoleTest
             Console.WriteLine($"Temprature User={data.user},System={data.system}");
         }
 
-        private static void testDrawPartial(IT8951SPIDevice device, string imagePath, Rectangle area, bool waitEnter = false)
+        private static void testDrawPartial(IT8951SPIDevice device, string imagePath, Rectangle area, bool waitEnter = false, DisplayModeEnum mode = DisplayModeEnum.GC16)
         {
             using (new Operation($"Test draw partial"))
             {
@@ -188,14 +190,15 @@ namespace ConsoleTest
             }
         }
 
-        private static void testClearScreen(IT8951SPIDevice device, bool init = false)
+        private static void testClearScreen(IT8951SPIDevice device, DisplayModeEnum mode = DisplayModeEnum.GC16)
         {
             using (new Operation("testClearScreen"))
             {
                 device.Draw(x =>
                 {
                     x.Buffer.Span.Fill(0xff);
-                }, mode: init ? DisplayModeEnum.INIT : DisplayModeEnum.GC16);
+                }, mode: mode
+                , bpp: mode == DisplayModeEnum.A2 ? ImagePixelPackEnum.BPP1 : ImagePixelPackEnum.BPP4);
             }
         }
         private static void testClearArea(IT8951SPIDevice device, Rectangle area)
@@ -208,13 +211,15 @@ namespace ConsoleTest
                 }, (ushort)area.X, (ushort)area.Y, (ushort)area.Width, (ushort)area.Height);
             }
         }
-        private static void testdrawImage(IT8951SPIDevice device, string imagePath, bool waitEnter = false)
+        private static void testdrawImage(IT8951SPIDevice device, string imagePath, bool waitEnter = false,DisplayModeEnum mode=DisplayModeEnum.GC16)
         {
             using (new Operation("testdrawImage"))
             {
                 var img = Image.Load<L8>(imagePath);
                 
-                device.Draw(img);
+                device.Draw(image: img,
+                    bpp: mode==DisplayModeEnum.A2?ImagePixelPackEnum.BPP1:ImagePixelPackEnum.BPP4,
+                    displayMode:mode);
                 if (waitEnter)
                 {
                     Console.WriteLine($"Image {imagePath} Ready, Press ENTER to continue");
