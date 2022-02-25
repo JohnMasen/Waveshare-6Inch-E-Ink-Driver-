@@ -83,10 +83,10 @@ namespace WaveshareEInkDriver
             device.SendBuffer(pixelBuffer);
             device.LoadImageEnd();
         }
-        public static void LoadImageArea(this IT8951SPIDevice device, ImagePixelPackEnum bpp, ImageEndianTypeEnum endian, ImageRotateEnum rotate, Span<byte> pixelBuffer, ushort x, ushort y, ushort width, ushort height)
+        public static void LoadImageArea(this IT8951SPIDevice device, ImagePixelPackEnum bpp, ImageEndianTypeEnum endian, ImageRotateEnum rotate, Span<byte> pixelBuffer, ushort x, ushort y, ushort width, ushort height,ushort displayBufferAddressOffset=0)
         {
             device.WaitForDisplayReady(TimeSpan.FromSeconds(5));
-            device.SetTargetMemoryAddress(device.DeviceInfo.BufferAddress);
+            device.SetTargetMemoryAddress(device.DeviceInfo.BufferAddress+displayBufferAddressOffset);
             device.LoadImageAreaStart(endian, bpp, rotate, x, y, width, height);
             device.SendBuffer(pixelBuffer);
             device.LoadImageEnd();

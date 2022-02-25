@@ -133,9 +133,9 @@ namespace WaveshareEInkDriver
         {
             io.SendCommand(IT8951SPIDeviceIO.DeviceCommand.DPY_AREA, x, y, width, height, (ushort)mode);
         }
-        public void DisplayArea(ushort x, ushort y, ushort width, ushort height, DisplayModeEnum mode,int memoryAddress)
+        public void DisplayBufferArea(ushort x, ushort y, ushort width, ushort height, DisplayModeEnum mode,int memoryAddress)
         {
-            io.SendCommand(IT8951SPIDeviceIO.DeviceCommand.DPY_BUF_AREA, x, y, width, height, (ushort)mode,(ushort)memoryAddress,(ushort)(memoryAddress>>16) );
+            io.SendCommand(IT8951SPIDeviceIO.DeviceCommand.DPY_BUF_AREA, x, y, width, height, (ushort)mode,(ushort)memoryAddress,(ushort)memoryAddress );
         }
 
         public (ushort user,ushort system) GetTemprature()
