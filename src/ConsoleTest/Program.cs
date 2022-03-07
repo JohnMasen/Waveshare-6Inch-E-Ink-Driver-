@@ -1,4 +1,5 @@
 ﻿using Iot.Device.Ads1115;
+using Microsoft.Extensions.Configuration;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
@@ -21,14 +22,16 @@ namespace ConsoleTest
         static void Main(string[] args)
         {
             //var pp = new IT8951SPIDeviceExtension.PixelBuffer(0, 0, 800, 600, ImagePixelPackEnum.BPP1);
-
+            var config = new ConfigurationBuilder()
+                .AddCommandLine(args)
+                .Build();
             SpiConnectionSettings settings = new SpiConnectionSettings(0, 0);
             settings.ClockFrequency = 12000000; //suggested 12MHZ in doc
             settings.Mode = SpiMode.Mode0;
             settings.ChipSelectLineActiveState = PinValue.Low;
             settings.DataFlow = DataFlow.MsbFirst;
             SpiDevice spi = SpiDevice.Create(settings);
-            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(settings));
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(settings)); 
             var device = new IT8951SPIDevice(new IT8951SPIDeviceIO(spi, readyPin: 24, resetPin: 17));
             System.Diagnostics.Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
             Console.WriteLine($"IsLittleEndian:{BitConverter.IsLittleEndian} ");
@@ -47,13 +50,8 @@ namespace ConsoleTest
             foreach (var f in Directory.GetFiles("Images"))
             {
                 testClearScreen(device);
-                testdrawImage(device, f,true);
-                //testClearScreen(device, false);
-                //testDrawPartial(device, f, new Rectangle(0, 0, 800, 600), true);
-                //testClearScreen(device, false);
-                //specialTest(device, f, true);
-                //testClearScreen(device, DisplayModeEnum.A2);
-                //testDrawPartial(device, f, new Rectangle(0, 0, 800, 600), true, DisplayModeEnum.A2);
+                testdrawImage(device, f,true,DisplayModeEnum.A2);
+                
             }
 
             //testClearScreen(device, false);

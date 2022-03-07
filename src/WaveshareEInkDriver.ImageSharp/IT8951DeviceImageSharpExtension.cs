@@ -92,9 +92,26 @@ namespace WaveshareEInkDriver
                     setDeviceStride(rowBytes, targetRow, p.PixelPerByte, p.GapLeft, p.GapRight, image.Width);
                 }
             });
-            device.Set1BPPMode(bpp == ImagePixelPackEnum.BPP1);
-            device.LoadImage(bpp, ImageEndianTypeEnum.BigEndian, ImageRotateEnum.Rotate0, p.Buffer.Span);
-            device.RefreshScreen(displayMode);
+            
+            
+            
+            if (bpp == ImagePixelPackEnum.BPP1)
+            {
+                ushort width = (ushort)(image.Width / 8 );
+                ushort height = (ushort)(image.Height);
+
+                //use bpp8 to transfer full bytes data
+                device.LoadImageArea(ImagePixelPackEnum.BPP8, ImageEndianTypeEnum.BigEndian, ImageRotateEnum.Rotate0, p.Buffer.Span, 0, 0, width, height);
+                device.Set1BPPMode(true);
+                device.RefreshArea(displayMode, 0, 0, (ushort)image.Width, (ushort)image.Height);
+                device.Set1BPPMode(false);//restore to default display mode
+            }
+            else
+            {
+                device.LoadImage(bpp, ImageEndianTypeEnum.BigEndian, ImageRotateEnum.Rotate0, p.Buffer.Span);
+                device.RefreshScreen(displayMode);
+            }
+
         }
 
         private static void setDeviceStride(Span<L8> L8Strinde, Span<byte> deviceStride, int pixelPerByte, int gapLeft, int gapRight, int width)
