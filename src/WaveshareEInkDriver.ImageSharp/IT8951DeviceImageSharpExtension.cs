@@ -16,7 +16,7 @@ namespace WaveshareEInkDriver
         /// <param name="autoResize">Resize the image if necessary. An exception will thrown if this parameter is false and image size not equal device screen size</param>
         /// <param name="bpp"></param>
         /// <param name="displayMode">Display mode, GC16=16 level greyscale, A2=Balck and White</param>
-        public static void Draw(this IT8951SPIDevice device,Image<L8> image,bool dither=true, bool autoResize=true, ImagePixelPackEnum bpp = ImagePixelPackEnum.BPP4,DisplayModeEnum displayMode=DisplayModeEnum.GC16)
+        public static void DrawImage(this IT8951SPIDevice device,Image<L8> image,bool dither=true, bool autoResize=true, ImagePixelPackEnum bpp = ImagePixelPackEnum.BPP4,DisplayModeEnum displayMode=DisplayModeEnum.GC16)
         {
             if (displayMode==DisplayModeEnum.INIT)
             {
@@ -89,7 +89,7 @@ namespace WaveshareEInkDriver
                 {
                     var rowBytes = acc.GetRowSpan(i);
                     var targetRow = IT8951SPIDeviceExtension.PixelBuffer.GetRowBuffer(p, i).Span;
-                    setDeviceStride(rowBytes, targetRow, p.PixelPerByte, p.GapLeft, p.GapRight, image.Width);
+                    setDeviceStride(rowBytes, targetRow, p.PixelPerByte, p.GapLeft, p.GapRight, image.Width,bpp==ImagePixelPackEnum.BPP1);
                 }
             });
             
@@ -114,7 +114,7 @@ namespace WaveshareEInkDriver
 
         }
 
-        private static void setDeviceStride(Span<L8> L8Strinde, Span<byte> deviceStride, int pixelPerByte, int gapLeft, int gapRight, int width)
+        private static void setDeviceStride(Span<L8> L8Strinde, Span<byte> deviceStride, int pixelPerByte, int gapLeft, int gapRight, int width,bool reverseBitOrder=false)
         {
             int pixelSize = 8 / pixelPerByte; //pixel size in bits
             for (int i = 0; i < deviceStride.Length; i++)
@@ -126,7 +126,14 @@ namespace WaveshareEInkDriver
                     if (pixelIndex >= 0 && pixelIndex < width)
                     {
                         byte value = (byte)(L8Strinde[pixelIndex].PackedValue >> (8 - pixelSize)); //shrink to target size
-                        value = (byte)(value << (pixelSize * (pixelPerByte - p - 1)));//shift bits to correct pixel position
+                        if (!reverseBitOrder)
+                        {
+                            value = (byte)(value << (pixelSize * (pixelPerByte - p - 1)));//shift bits to correct pixel position
+                        }
+                        else
+                        {
+                            value= (byte)(value << (pixelSize * p));//shift bits to correct pixel position
+                        }
                         deviceStride[i] |= value;
                     }
                     pixelIndex++;

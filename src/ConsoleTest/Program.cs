@@ -47,11 +47,18 @@ namespace ConsoleTest
             RWVComTest(device);
             testClearScreen(device, DisplayModeEnum.INIT);
             //specialTest(device, "Images/t1.bmp", true);
+            testClearScreen(device, DisplayModeEnum.GC16);
             foreach (var f in Directory.GetFiles("Images"))
             {
-                testClearScreen(device);
+                
                 testdrawImage(device, f,true,DisplayModeEnum.A2);
                 
+            }
+            foreach (var f in Directory.GetFiles("Images"))
+            {
+                testClearScreen(device, DisplayModeEnum.GC16);
+                testdrawImage(device, f, true, DisplayModeEnum.GC16);
+
             }
 
             //testClearScreen(device, false);
@@ -215,7 +222,7 @@ namespace ConsoleTest
             {
                 var img = Image.Load<L8>(imagePath);
                 
-                device.Draw(image: img,
+                device.DrawImage(image: img,
                     bpp: mode==DisplayModeEnum.A2?ImagePixelPackEnum.BPP1:ImagePixelPackEnum.BPP4,
                     displayMode:mode);
                 if (waitEnter)
