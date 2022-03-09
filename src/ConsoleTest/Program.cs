@@ -197,14 +197,24 @@ namespace ConsoleTest
 
         private static void testClearScreen(IT8951SPIDevice device, DisplayModeEnum mode = DisplayModeEnum.GC16)
         {
-            using (new Operation("testClearScreen"))
+            //TODO: move clear screen to device extension
+            if (mode==DisplayModeEnum.INIT)
             {
-                device.Draw(x =>
-                {
-                    x.Buffer.Span.Fill(0xff);
-                }, mode: mode
-                , bpp: mode == DisplayModeEnum.A2 ? ImagePixelPackEnum.BPP1 : ImagePixelPackEnum.BPP4);
+                device.RefreshScreen(DisplayModeEnum.INIT);
             }
+            else
+            {
+                using (new Operation("testClearScreen"))
+                {
+                    device.Draw(x =>
+                    {
+                        x.Buffer.Span.Fill(0xff);
+                    }, mode: mode
+                    , bpp: mode == DisplayModeEnum.A2 ? ImagePixelPackEnum.BPP1 : ImagePixelPackEnum.BPP4);
+                }
+            }
+            
+            
         }
         private static void testClearArea(IT8951SPIDevice device, Rectangle area)
         {

@@ -132,7 +132,7 @@ namespace WaveshareEInkDriver
                         }
                         else
                         {
-                            value= (byte)(value << (pixelSize * p));//shift bits to correct pixel position
+                            value= (byte)(value << (pixelSize * p));//shift bits to correct pixel position,1bpp uses reversed bit order
                         }
                         deviceStride[i] |= value;
                     }
@@ -140,5 +140,8 @@ namespace WaveshareEInkDriver
                 }
             }
         }
+
+
+        //TODO: add partial update
     }
 }
