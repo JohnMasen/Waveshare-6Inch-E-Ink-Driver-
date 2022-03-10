@@ -1,7 +1,9 @@
 ﻿using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Advanced;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using System;
+using System.Linq;
 
 namespace WaveshareEInkDriver
 {
@@ -139,11 +141,8 @@ namespace WaveshareEInkDriver
             ushort h = (ushort)sourceImageArea.Height;
             if (bpp == ImagePixelPackEnum.BPP1)
             {
-                ushort width = (ushort)(image.Width / 8);
-                ushort height = (ushort)(image.Height);
-
                 //use bpp8 to transfer full bytes data
-                device.LoadImageArea(ImagePixelPackEnum.BPP8, ImageEndianTypeEnum.BigEndian, ImageRotateEnum.Rotate0, p.Buffer.Span, x,y,w,h);
+                device.LoadImageArea(ImagePixelPackEnum.BPP8, ImageEndianTypeEnum.BigEndian, ImageRotateEnum.Rotate0, p.Buffer.Span,(ushort)(x/8),y,(ushort)(w/8),h);
                 device.Set1BPPMode(true);
                 device.RefreshArea(displayMode, x, y, w, h);
                 device.Set1BPPMode(false);//restore to default display mode
@@ -156,7 +155,7 @@ namespace WaveshareEInkDriver
         }
         private static void setDeviceStride(Span<L8> L8Strinde, Span<byte> deviceStride, int pixelPerByte, int gapLeft, int gapRight, int width,bool reverseBitOrder=false)
         {
-            //TODO: fixed partial update pixel alignment
+            //TODO: fix 1bpp 4 byte alignment
             int pixelSize = 8 / pixelPerByte; //pixel size in bits
             for (int i = 0; i < deviceStride.Length; i++)
             {

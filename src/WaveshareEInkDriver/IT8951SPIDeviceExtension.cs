@@ -1,4 +1,5 @@
-﻿using SixLabors.ImageSharp.Formats.Bmp;
+﻿using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Bmp;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -16,6 +17,7 @@ namespace WaveshareEInkDriver
             public readonly int GapLeft;
             public readonly int GapRight;
             public readonly int PixelAlignmentWidth;
+            public readonly Rectangle BufferArea;
             /// <summary>
             /// Buffer size in pixel for each line
             /// </summary>
@@ -58,6 +60,7 @@ namespace WaveshareEInkDriver
                 GapRight = x2 % pixelsPerPack == 0 ? 0 : pixelsPerPack - x2 % pixelsPerPack;
 
                 Stride = (width + GapLeft + GapRight) / PixelPerByte;
+                BufferArea = new Rectangle(x - GapLeft, y, width + GapLeft + GapRight, height);
                 Buffer = new byte[Stride * height].AsMemory();
             }
             
