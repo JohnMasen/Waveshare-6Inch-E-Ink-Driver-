@@ -60,12 +60,12 @@ namespace WaveshareEInkDriver
                 Stride = (width + GapLeft + GapRight) / PixelPerByte;
                 Buffer = new byte[Stride * height].AsMemory();
             }
-            public static Memory<byte> GetRowBuffer(PixelBuffer pixelBuffer, int row)
-            {
-                return pixelBuffer.Buffer.Slice(pixelBuffer.Stride * row,pixelBuffer.Stride);
-            }
+            
         }
-
+        public static Memory<byte> GetRowBuffer(this PixelBuffer pixelBuffer, int row)
+        {
+            return pixelBuffer.Buffer.Slice(pixelBuffer.Stride * row, pixelBuffer.Stride);
+        }
 
         public static PixelBuffer PrepareBuffer(this IT8951SPIDevice device, ImagePixelPackEnum bpp)
             => PrepareBuffer(device, bpp, 0, 0, device.DeviceInfo.ScreenSize.Width, device.DeviceInfo.ScreenSize.Height);
@@ -105,8 +105,19 @@ namespace WaveshareEInkDriver
         {
             var p = device.PrepareBuffer(bpp);
             pixelOperateCallback(p);
-            device.LoadImage(bpp, endian, rotate, p.Buffer.Span);
-            device.RefreshScreen(mode);
+            if (bpp==ImagePixelPackEnum.BPP1)
+            {
+                device.LoadImageArea(ImagePixelPackEnum.BPP8, endian, rotate, p.Buffer.Span, 0, 0, (ushort)(device.DeviceInfo.ScreenSize.Width / 8),(ushort) device.DeviceInfo.ScreenSize.Height);
+                device.Set1BPPMode(true);
+                device.RefreshScreen(DisplayModeEnum.A2);
+                device.Set1BPPMode(false);
+            }
+            else
+            {
+                device.LoadImage(bpp, endian, rotate, p.Buffer.Span);
+                device.RefreshScreen(mode);
+            }
+            
         }
 
         public static void DrawArea(this IT8951SPIDevice device, Action<PixelBuffer> pixelOperateCallback, ushort x, ushort y, ushort width, ushort height, ImagePixelPackEnum bpp = ImagePixelPackEnum.BPP4, ImageEndianTypeEnum endian = ImageEndianTypeEnum.BigEndian, ImageRotateEnum rotate = ImageRotateEnum.Rotate0, DisplayModeEnum mode = DisplayModeEnum.GC16)
@@ -115,6 +126,31 @@ namespace WaveshareEInkDriver
             pixelOperateCallback(p);
             device.LoadImageArea(bpp, endian, rotate, p.Buffer.Span, x, y, width, height);
             device.RefreshArea(mode, x, y, width, height);
+        }
+
+        public static void ClearScreen(this IT8951SPIDevice device, DisplayModeEnum mode = DisplayModeEnum.INIT)
+        {
+            switch (mode)
+            {
+                case DisplayModeEnum.INIT:
+                    device.RefreshScreen(DisplayModeEnum.INIT);
+                    break;
+                case DisplayModeEnum.GC16:
+                    device.Draw(b =>
+                    {
+                        b.Buffer.Span.Fill(0xff);
+                    });
+                    break;
+                case DisplayModeEnum.A2:
+                    device.Draw(b =>
+                    {
+                        b.Buffer.Span.Fill(0xff);
+                    },bpp:ImagePixelPackEnum.BPP1,
+                    mode:DisplayModeEnum.A2);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(mode));
+            }
         }
     }
 }

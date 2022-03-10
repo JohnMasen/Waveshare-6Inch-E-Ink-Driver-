@@ -33,33 +33,38 @@ namespace ConsoleTest
             SpiDevice spi = SpiDevice.Create(settings);
             Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(settings)); 
             var device = new IT8951SPIDevice(new IT8951SPIDeviceIO(spi, readyPin: 24, resetPin: 17));
-            System.Diagnostics.Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
+            //uncomment line below to output debug info
+            //System.Diagnostics.Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
             Console.WriteLine($"IsLittleEndian:{BitConverter.IsLittleEndian} ");
             //Console.WriteLine("Waiting for debugger attach, press ENTER continue");
             //Console.ReadLine();
             using (new Operation("Init"))
             {
                 device.Init();
+                device.SetVCom(-1.91f);//change this to your device VCOM value
             }
             ReadTempratureTest(device);
             ReadInfoTest(device);
             RWRegisterTest(device);
             RWVComTest(device);
             testClearScreen(device, DisplayModeEnum.INIT);
-            //specialTest(device, "Images/t1.bmp", true);
-            testClearScreen(device, DisplayModeEnum.GC16);
-            foreach (var f in Directory.GetFiles("Images"))
-            {
-                
-                testdrawImage(device, f,true,DisplayModeEnum.A2);
-                
-            }
-            foreach (var f in Directory.GetFiles("Images"))
-            {
-                testClearScreen(device, DisplayModeEnum.GC16);
-                testdrawImage(device, f, true, DisplayModeEnum.GC16);
 
-            }
+
+            drawImagePartialTest(device, "Images/3.jpg",new Size(100,100),DisplayModeEnum.GC16);
+            //specialTest(device, "Images/t1.bmp", true);
+
+            //foreach (var f in Directory.GetFiles("Images"))
+            //{
+            //    testClearScreen(device, DisplayModeEnum.A2);
+            //    testdrawImage(device, f,true,DisplayModeEnum.A2);
+
+            //}
+            //foreach (var f in Directory.GetFiles("Images"))
+            //{
+            //    testClearScreen(device, DisplayModeEnum.GC16);
+            //    testdrawImage(device, f, true, DisplayModeEnum.GC16);
+
+            //}
 
             //testClearScreen(device, false);
             //testdrawImage(device, "Images/3.jpg");
@@ -75,59 +80,35 @@ namespace ConsoleTest
             Console.WriteLine("done");
         }
 
-        private static void specialTest(IT8951SPIDevice device, string imagePath, bool waitEnter = false)
+        private static void drawImagePartialTest(IT8951SPIDevice device,string imagePath, Size gridSize, DisplayModeEnum displayMode=DisplayModeEnum.GC16)
         {
-            using (new Operation("specialTest"))
+            Image<L8> image = Image.Load<L8>(imagePath);
+            var o = new ResizeOptions();
+            o.Size = new Size(device.DeviceInfo.ScreenSize.Width, device.DeviceInfo.ScreenSize.Height);
+            o.Mode = ResizeMode.Pad;
+            image.Mutate(opt =>
             {
-                var img = Image.Load<L8>(imagePath);
-                if (img.Width != device.DeviceInfo.ScreenSize.Width || img.Height != device.DeviceInfo.ScreenSize.Height)
+                opt.Resize(o);
+                if (displayMode==DisplayModeEnum.A2)
                 {
-                    img.Mutate(opt =>
-                    {
-                        ResizeOptions o = new ResizeOptions();
-                        o.Size = new Size(device.DeviceInfo.ScreenSize.Width, device.DeviceInfo.ScreenSize.Height);
-                        o.Mode = ResizeMode.Pad;
-                        opt.Resize(o);
-                        Color[] palette = new Color[16];
-                        for (int i = 0; i < palette.Length; i++)
-                        {
-                            palette[i] = new Color(new L16((ushort)(i * 4096)));
-                        }
-                        //opt.Dither(KnownDitherings.FloydSteinberg, palette);
-                    });
+                    opt.BinaryDither(KnownDitherings.FloydSteinberg);
                 }
-                device.Draw(x =>
+            });
+            
+            for (int y1 = 0; y1 < image.Height; y1+=gridSize.Height)
+            {
+                int y = Math.Min(y1, image.Height - 1);
+                for (int x1 = 0; x1 < image.Width; x1+=gridSize.Width)
                 {
-                    img.ProcessPixelRows(acc =>
-                    {
-
-                        for (int i = 0; i < acc.Height / 2; i++)
-                        {
-                            var rowBytes = acc.GetRowSpan(i);
-                            var targetRow = PixelBuffer.GetRowBuffer(x, i).Span;
-                            setDeviceStride(rowBytes, targetRow, x.PixelPerByte, x.GapLeft, x.GapRight, img.Width);
-                        }
-                        for (int i = acc.Height / 2; i < acc.Height; i++)
-                        {
-                            var rowBytes = acc.GetRowSpan(i);
-                            var targetRow = PixelBuffer.GetRowBuffer(x, i);
-                            int index = 0;
-                            for (int j = 0; j < rowBytes.Length; j += 2)
-                            {
-                                byte output = (byte)(rowBytes[j].PackedValue & 0xf0);//from L8 to L4 is value/16(>>4), then make it high bits(<<4) which is AND 0xf0
-                                output = (byte)(output | (byte)(rowBytes[j + 1].PackedValue >> 4));//second L4 bit value,output byte= 2nd value /16 | first L4 value
-                                targetRow.Span[index++] = output;
-                            }
-                        }
-                    });
-                });
-                if (waitEnter)
-                {
-                    Console.WriteLine($"Image {imagePath} Ready, Press ENTER to continue");
-                    Console.ReadLine();
+                    int x = Math.Min(x1, image.Width - 1);
+                    Console.WriteLine($"x={x},y={y},w={gridSize.Width},h={gridSize.Height}");
+                    device.DrawImagePartial(image, new Rectangle(x, y, gridSize.Width, gridSize.Height), new Point(x, y),
+                        displayMode==DisplayModeEnum.GC16?ImagePixelPackEnum.BPP4:ImagePixelPackEnum.BPP1,
+                        displayMode);
                 }
             }
         }
+        
 
         private static void ReadTempratureTest(IT8951SPIDevice device)
         {
@@ -162,7 +143,7 @@ namespace ConsoleTest
                         for (int i = 0; i < acc.Height; i++)
                         {
                             var rowBytes = acc.GetRowSpan(i);
-                            var targetRow = PixelBuffer.GetRowBuffer(x, i).Span;
+                            var targetRow = x.GetRowBuffer(i).Span;
                             setDeviceStride(rowBytes, targetRow, x.PixelPerByte, x.GapLeft, x.GapRight, img.Width);
                         }
                     });
@@ -198,21 +179,11 @@ namespace ConsoleTest
         private static void testClearScreen(IT8951SPIDevice device, DisplayModeEnum mode = DisplayModeEnum.GC16)
         {
             //TODO: move clear screen to device extension
-            if (mode==DisplayModeEnum.INIT)
-            {
-                device.RefreshScreen(DisplayModeEnum.INIT);
-            }
-            else
-            {
+            
                 using (new Operation("testClearScreen"))
                 {
-                    device.Draw(x =>
-                    {
-                        x.Buffer.Span.Fill(0xff);
-                    }, mode: mode
-                    , bpp: mode == DisplayModeEnum.A2 ? ImagePixelPackEnum.BPP1 : ImagePixelPackEnum.BPP4);
+                    device.ClearScreen(mode);
                 }
-            }
             
             
         }

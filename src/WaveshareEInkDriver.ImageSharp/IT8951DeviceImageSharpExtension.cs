@@ -88,7 +88,7 @@ namespace WaveshareEInkDriver
                 for (int i = 0; i < acc.Height; i++)
                 {
                     var rowBytes = acc.GetRowSpan(i);
-                    var targetRow = IT8951SPIDeviceExtension.PixelBuffer.GetRowBuffer(p, i).Span;
+                    var targetRow = p.GetRowBuffer(i).Span;
                     setDeviceStride(rowBytes, targetRow, p.PixelPerByte, p.GapLeft, p.GapRight, image.Width,bpp==ImagePixelPackEnum.BPP1);
                 }
             });
@@ -114,8 +114,49 @@ namespace WaveshareEInkDriver
 
         }
 
+
+
+        public static void DrawImagePartial(this IT8951SPIDevice device, Image<L8> image, Rectangle sourceImageArea,Point targetPosition, ImagePixelPackEnum bpp = ImagePixelPackEnum.BPP4, DisplayModeEnum displayMode = DisplayModeEnum.GC16)
+        {
+            if (displayMode == DisplayModeEnum.INIT)
+            {
+                throw new ArgumentOutOfRangeException(nameof(displayMode), "displayMode can't be INIT while drawing image");
+            }
+            var p = device.PrepareBuffer(bpp,targetPosition.X,targetPosition.Y,sourceImageArea.Width,sourceImageArea.Height);
+            image.ProcessPixelRows(acc =>
+            {
+
+                for (int i = 0; i < sourceImageArea.Height; i++)
+                {
+                    var rowBytes = acc.GetRowSpan(sourceImageArea.Y+i).Slice(sourceImageArea.X,sourceImageArea.Width);
+                    var targetRow = p.GetRowBuffer(i).Span;
+                    setDeviceStride(rowBytes, targetRow, p.PixelPerByte, p.GapLeft, p.GapRight, sourceImageArea.Width, bpp == ImagePixelPackEnum.BPP1);
+                }
+            });
+            ushort x = (ushort)targetPosition.X;
+            ushort y = (ushort)targetPosition.Y;
+            ushort w = (ushort)sourceImageArea.Width;
+            ushort h = (ushort)sourceImageArea.Height;
+            if (bpp == ImagePixelPackEnum.BPP1)
+            {
+                ushort width = (ushort)(image.Width / 8);
+                ushort height = (ushort)(image.Height);
+
+                //use bpp8 to transfer full bytes data
+                device.LoadImageArea(ImagePixelPackEnum.BPP8, ImageEndianTypeEnum.BigEndian, ImageRotateEnum.Rotate0, p.Buffer.Span, x,y,w,h);
+                device.Set1BPPMode(true);
+                device.RefreshArea(displayMode, x, y, w, h);
+                device.Set1BPPMode(false);//restore to default display mode
+            }
+            else
+            {
+                device.LoadImageArea(bpp, ImageEndianTypeEnum.BigEndian, ImageRotateEnum.Rotate0, p.Buffer.Span, x, y, w, h);
+                device.RefreshArea(displayMode, x, y, w, h);
+            }
+        }
         private static void setDeviceStride(Span<L8> L8Strinde, Span<byte> deviceStride, int pixelPerByte, int gapLeft, int gapRight, int width,bool reverseBitOrder=false)
         {
+            //TODO: fixed partial update pixel alignment
             int pixelSize = 8 / pixelPerByte; //pixel size in bits
             for (int i = 0; i < deviceStride.Length; i++)
             {
@@ -142,6 +183,6 @@ namespace WaveshareEInkDriver
         }
 
 
-        //TODO: add partial update
+        
     }
 }
