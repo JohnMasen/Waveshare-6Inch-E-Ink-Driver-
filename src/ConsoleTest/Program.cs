@@ -51,20 +51,23 @@ namespace ConsoleTest
             testClearScreen(device, DisplayModeEnum.INIT);
 
 
-            drawImagePartialTest(device, "Images/3.jpg", new Size(96, 96), DisplayModeEnum.GC16);
+            drawImagePartialTest(device, "Images/3.jpg", new Size(96, 96), DisplayModeEnum.A2);
             //specialTest(device, "Images/t1.bmp", true);
+
+
+            //testClearScreen(device, DisplayModeEnum.GC16);
             //testClearScreen(device, DisplayModeEnum.INIT);
             //foreach (var f in Directory.GetFiles("Images"))
             //{
-            //    testClearScreen(device, DisplayModeEnum.A2);
+            //    //testClearScreen(device, DisplayModeEnum.A2);
             //    testdrawImage(device, f, true, DisplayModeEnum.A2);
 
             //}
             //foreach (var f in Directory.GetFiles("Images"))
             //{
-            //    testClearScreen(device, DisplayModeEnum.GC16);
-            //    testdrawImage(device, f, true, DisplayModeEnum.GC16);
 
+            //    testdrawImage(device, f, true, DisplayModeEnum.GC16);
+            //    testClearScreen(device, DisplayModeEnum.GC16);
             //}
 
             //testClearScreen(device, false);
@@ -76,8 +79,8 @@ namespace ConsoleTest
             //    testDrawPartial(device, "Images/4.jpg", area, true);
             //}
 
-
-            testClearScreen(device, DisplayModeEnum.INIT);
+            testClearScreen(device, DisplayModeEnum.GC16);//IMPORTANT:clear display buffer before shutdown
+            testClearScreen(device, DisplayModeEnum.INIT);//
             Console.WriteLine("done");
         }
 
@@ -188,8 +191,6 @@ namespace ConsoleTest
 
         private static void testClearScreen(IT8951SPIDevice device, DisplayModeEnum mode = DisplayModeEnum.GC16)
         {
-            //TODO: move clear screen to device extension
-
             using (new Operation("testClearScreen"))
             {
                 device.ClearScreen(mode);

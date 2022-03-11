@@ -124,6 +124,13 @@ namespace WaveshareEInkDriver
             {
                 throw new ArgumentOutOfRangeException(nameof(displayMode), "displayMode can't be INIT while drawing image");
             }
+            if (bpp==ImagePixelPackEnum.BPP1)
+            {
+                if (sourceImageArea.Width%32!=0 || targetPosition.X%32!=0)
+                {
+                    throw new ArgumentOutOfRangeException("position X and width must be multiple of 32 in 1bpp mode");
+                }
+            }
             var p = device.PrepareBuffer(bpp,targetPosition.X,targetPosition.Y,sourceImageArea.Width,sourceImageArea.Height);
             image.ProcessPixelRows(acc =>
             {
@@ -155,15 +162,14 @@ namespace WaveshareEInkDriver
         }
         private static void setDeviceStride(Span<L8> L8Strinde, Span<byte> deviceStride, int pixelPerByte, int gapLeft, int gapRight, int width,bool reverseBitOrder=false)
         {
-            //TODO: fix 1bpp 4 byte alignment
             int pixelSize = 8 / pixelPerByte; //pixel size in bits
-            for (int i = 0; i < deviceStride.Length; i++)
+            for (int i = 0; i < deviceStride.Length; i++)//scan target buffer
             {
-                int pixelIndex = i * pixelPerByte - gapLeft;
-                for (int p = 0; p < pixelPerByte; p++)
+                int pixelIndex = i * pixelPerByte - gapLeft; //try find the corresponding pixel
+                for (int p = 0; p < pixelPerByte; p++) //fill byte with pixels 
                 {
 
-                    if (pixelIndex >= 0 && pixelIndex < width)
+                    if (pixelIndex >= 0 && pixelIndex < width) //if pixel is in transfer range
                     {
                         byte value = (byte)(L8Strinde[pixelIndex].PackedValue >> (8 - pixelSize)); //shrink to target size
                         if (!reverseBitOrder)
