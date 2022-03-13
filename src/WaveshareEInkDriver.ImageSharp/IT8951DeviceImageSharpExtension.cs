@@ -41,7 +41,7 @@ namespace WaveshareEInkDriver
                     });
                 }
             }
-            var p = device.PrepareBuffer(bpp);
+            var p = new DrawingBuffer (device,bpp);
             if (dither)
             {
                 switch (bpp)
@@ -90,8 +90,9 @@ namespace WaveshareEInkDriver
                 for (int i = 0; i < acc.Height; i++)
                 {
                     var rowBytes = acc.GetRowSpan(i);
-                    var targetRow = p.GetRowBuffer(i).Span;
-                    setDeviceStride(rowBytes, targetRow, p.PixelPerByte, p.GapLeft, p.GapRight, image.Width,bpp==ImagePixelPackEnum.BPP1);
+                    p.WriteRow(rowBytes, i, getByteFromL8);
+                    //var targetRow = p.GetRowBuffer(i).Span;
+                    //setDeviceStride(rowBytes, targetRow, p.PixelPerByte, p.GapLeft, p.GapRight, image.Width,bpp==ImagePixelPackEnum.BPP1);
                 }
             });
             
@@ -131,15 +132,16 @@ namespace WaveshareEInkDriver
                     throw new ArgumentOutOfRangeException("position X and width must be multiple of 32 in 1bpp mode");
                 }
             }
-            var p = device.PrepareBuffer(bpp,targetPosition.X,targetPosition.Y,sourceImageArea.Width,sourceImageArea.Height);
+            var p = new DrawingBuffer(targetPosition.X,targetPosition.Y,sourceImageArea.Width,sourceImageArea.Height,bpp);
             image.ProcessPixelRows(acc =>
             {
 
                 for (int i = 0; i < sourceImageArea.Height; i++)
                 {
                     var rowBytes = acc.GetRowSpan(sourceImageArea.Y+i).Slice(sourceImageArea.X,sourceImageArea.Width);
-                    var targetRow = p.GetRowBuffer(i).Span;
-                    setDeviceStride(rowBytes, targetRow, p.PixelPerByte, p.GapLeft, p.GapRight, sourceImageArea.Width, bpp == ImagePixelPackEnum.BPP1);
+                    //var targetRow = p.GetRowBuffer(i).Span;
+                    //setDeviceStride(rowBytes, targetRow, p.PixelPerByte, p.GapLeft, p.GapRight, sourceImageArea.Width, bpp == ImagePixelPackEnum.BPP1);
+                    p.WriteRow(rowBytes, i, getByteFromL8);
                 }
             });
             ushort x = (ushort)targetPosition.X;
@@ -160,34 +162,13 @@ namespace WaveshareEInkDriver
                 device.RefreshArea(displayMode, x, y, w, h);
             }
         }
-        private static void setDeviceStride(Span<L8> L8Strinde, Span<byte> deviceStride, int pixelPerByte, int gapLeft, int gapRight, int width,bool reverseBitOrder=false)
+        
+        //TODO: test display area buffer
+
+        private static byte getByteFromL8(L8 source)
         {
-            int pixelSize = 8 / pixelPerByte; //pixel size in bits
-            for (int i = 0; i < deviceStride.Length; i++)//scan target buffer
-            {
-                int pixelIndex = i * pixelPerByte - gapLeft; //try find the corresponding pixel
-                for (int p = 0; p < pixelPerByte; p++) //fill byte with pixels 
-                {
-
-                    if (pixelIndex >= 0 && pixelIndex < width) //if pixel is in transfer range
-                    {
-                        byte value = (byte)(L8Strinde[pixelIndex].PackedValue >> (8 - pixelSize)); //shrink to target size
-                        if (!reverseBitOrder)
-                        {
-                            value = (byte)(value << (pixelSize * (pixelPerByte - p - 1)));//shift bits to correct pixel position
-                        }
-                        else
-                        {
-                            value= (byte)(value << (pixelSize * p));//shift bits to correct pixel position,1bpp uses reversed bit order
-                        }
-                        deviceStride[i] |= value;
-                    }
-                    pixelIndex++;
-                }
-            }
+            return source.PackedValue;
         }
-
-
         
     }
 }
