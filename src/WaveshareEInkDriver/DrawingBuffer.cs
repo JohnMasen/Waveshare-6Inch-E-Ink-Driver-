@@ -2,24 +2,57 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace WaveshareEInkDriver
 {
+    /// <summary>
+    /// A block memory stores data should be transfered to IT8951
+    /// includes display position, pixel alignment info
+    /// </summary>
     public class DrawingBuffer
     {
-
+        /// <summary>
+        ///Memory buffer
+        /// </summary>
         public Memory<byte> Buffer { get; }
+        /// <summary>
+        /// Bits per pixel (Device mask code format)
+        /// </summary>
         public ImagePixelPackEnum Bpp { get; }
+
+        /// <summary>
+        /// pixel length in bit
+        /// </summary>
         public int BitsPerPixel { get; }
+        /// <summary>
+        /// How many pixels per byte
+        /// </summary>
         public int PixelPerByte => 8 / BitsPerPixel;
+        /// <summary>
+        /// how many empty pixels at the start of each row
+        /// these pixels are required for pixel alignment, device will ignore these pixels 
+        /// </summary>
         public int GapLeft { get; }
+        /// <summary>
+        /// how many empty pixels at the end of each row
+        /// these pixels are required for pixel alignment, device will ignore these pixels 
+        /// </summary>
         public int GapRight { get; }
+        /// <summary>
+        /// minimum buffer unit in bytes, buffer size must be multiple of this value
+        /// </summary>
         public int PixelAlignmentWidth { get; }
+        /// <summary>
+        /// The actual buffer area(including GapLeft and GapRight) , this may not equal to ImageArea due to byte alignment
+        /// </summary>
         public Rectangle BufferArea { get; }
-        public int X { get; }
-        public int Y { get; }
-        public int Width { get; }
-        public int Height { get; }
+
+        /// <summary>
+        /// The image area of this buffer
+        /// </summary>
+        public Rectangle ImageArea { get; }
+
         /// <summary>
         /// Buffer size in pixel for each line
         /// </summary>
@@ -27,10 +60,7 @@ namespace WaveshareEInkDriver
         public DrawingBuffer(int x, int y, int width, int height, ImagePixelPackEnum bpp)
         {
             Bpp = bpp;
-            X = x;
-            Y = y;
-            Width = width;
-            Height = height;
+            ImageArea = new Rectangle(x, y, width, height);
             BitsPerPixel = bpp switch
             {
                 ImagePixelPackEnum.BPP2 => 2,
@@ -69,6 +99,17 @@ namespace WaveshareEInkDriver
             return Buffer.Slice(Stride * row, Stride);
         }
 
+        public IEnumerable<Memory<byte>> RowBuffers
+        {
+            get
+            {
+                for (int i = 0; i < ImageArea.Height; i++)
+                {
+                    yield return GetRowBuffer(i);
+                }
+            }
+        }
+
         public void WriteRow<T>(Span<T> sourceRow,int row,Func<T,byte>valueConverter)
         {
             var target = GetRowBuffer(row).Span;
@@ -80,7 +121,7 @@ namespace WaveshareEInkDriver
                 for (int p = 0; p < PixelPerByte; p++) //fill byte with pixels 
                 {
 
-                    if (pixelIndex >= 0 && pixelIndex < Width) //if pixel is in transfer range
+                    if (pixelIndex >= 0 && pixelIndex < ImageArea.Width) //if pixel is in transfer range
                     {
                         byte value = (byte)(valueConverter(sourceRow[pixelIndex]) >> (8 - BitsPerPixel)); //shrink to target size
                         if (!reverseBitOrder)

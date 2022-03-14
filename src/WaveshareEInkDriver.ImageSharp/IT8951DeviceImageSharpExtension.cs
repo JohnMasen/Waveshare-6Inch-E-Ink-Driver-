@@ -4,6 +4,7 @@ using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace WaveshareEInkDriver
 {
@@ -18,13 +19,13 @@ namespace WaveshareEInkDriver
         /// <param name="autoResize">Resize the image if necessary. An exception will thrown if this parameter is false and image size not equal device screen size</param>
         /// <param name="bpp"></param>
         /// <param name="displayMode">Display mode, GC16=16 level greyscale, A2=Balck and White</param>
-        public static void DrawImage(this IT8951SPIDevice device,Image<L8> image,bool dither=true, bool autoResize=true, ImagePixelPackEnum bpp = ImagePixelPackEnum.BPP4,DisplayModeEnum displayMode=DisplayModeEnum.GC16)
+        public static void DrawImage(this IT8951SPIDevice device, Image<L8> image, bool dither = true, bool autoResize = true, ImagePixelPackEnum bpp = ImagePixelPackEnum.BPP4, DisplayModeEnum displayMode = DisplayModeEnum.GC16)
         {
-            if (displayMode==DisplayModeEnum.INIT)
+            if (displayMode == DisplayModeEnum.INIT)
             {
                 throw new ArgumentOutOfRangeException(nameof(displayMode), "displayMode can't be INIT while drawing image");
             }
-            if (device.DeviceInfo.ScreenSize.Width!=image.Width || device.DeviceInfo.ScreenSize.Height!=image.Height)
+            if (device.DeviceInfo.ScreenSize.Width != image.Width || device.DeviceInfo.ScreenSize.Height != image.Height)
             {
                 if (!autoResize)
                 {
@@ -41,7 +42,7 @@ namespace WaveshareEInkDriver
                     });
                 }
             }
-            var p = new DrawingBuffer (device,bpp);
+            var p = new DrawingBuffer(device, bpp);
             if (dither)
             {
                 switch (bpp)
@@ -54,12 +55,11 @@ namespace WaveshareEInkDriver
                             {
                                 palette[i] = new Color(new L16((ushort)(i * 16384)));
                             }
-                            opt.Dither(KnownDitherings.FloydSteinberg,palette);
+                            opt.Dither(KnownDitherings.FloydSteinberg, palette);
                         });
                         break;
                     case ImagePixelPackEnum.BPP3:
                         throw new NotImplementedException();
-                        break;
                     case ImagePixelPackEnum.BPP4: //maximum grey scale is 16 levels
                     case ImagePixelPackEnum.BPP8: //BPP8=BPP4, 4 lower bits are ignored
                         image.Mutate(opt =>
@@ -81,26 +81,17 @@ namespace WaveshareEInkDriver
                     default:
                         break;
                 }
-
-                
             }
-            image.ProcessPixelRows(acc =>
-            {
 
-                for (int i = 0; i < acc.Height; i++)
-                {
-                    var rowBytes = acc.GetRowSpan(i);
-                    p.WriteRow(rowBytes, i, getByteFromL8);
-                    //var targetRow = p.GetRowBuffer(i).Span;
-                    //setDeviceStride(rowBytes, targetRow, p.PixelPerByte, p.GapLeft, p.GapRight, image.Width,bpp==ImagePixelPackEnum.BPP1);
-                }
-            });
-            
-            
-            
+            Parallel.For(0, image.Height, i =>
+              {
+                  var rowBytes = image.DangerousGetPixelRowMemory(i).Span;
+                  p.WriteRow(rowBytes, i, getByteFromL8);
+               });
+
             if (bpp == ImagePixelPackEnum.BPP1)
             {
-                ushort width = (ushort)(image.Width / 8 );
+                ushort width = (ushort)(image.Width / 8);
                 ushort height = (ushort)(image.Height);
 
                 //use bpp8 to transfer full bytes data
@@ -117,32 +108,25 @@ namespace WaveshareEInkDriver
 
         }
 
-
-
-        public static void DrawImagePartial(this IT8951SPIDevice device, Image<L8> image, Rectangle sourceImageArea,Point targetPosition, ImagePixelPackEnum bpp = ImagePixelPackEnum.BPP4, DisplayModeEnum displayMode = DisplayModeEnum.GC16)
+        public static void DrawImagePartial(this IT8951SPIDevice device, Image<L8> image, Rectangle sourceImageArea, Point targetPosition, ImagePixelPackEnum bpp = ImagePixelPackEnum.BPP4, DisplayModeEnum displayMode = DisplayModeEnum.GC16)
         {
             if (displayMode == DisplayModeEnum.INIT)
             {
                 throw new ArgumentOutOfRangeException(nameof(displayMode), "displayMode can't be INIT while drawing image");
             }
-            if (bpp==ImagePixelPackEnum.BPP1)
+            if (bpp == ImagePixelPackEnum.BPP1)
             {
-                if (sourceImageArea.Width%32!=0 || targetPosition.X%32!=0)
+                if (sourceImageArea.Width % 32 != 0 || targetPosition.X % 32 != 0)
                 {
                     throw new ArgumentOutOfRangeException("position X and width must be multiple of 32 in 1bpp mode");
                 }
             }
-            var p = new DrawingBuffer(targetPosition.X,targetPosition.Y,sourceImageArea.Width,sourceImageArea.Height,bpp);
-            image.ProcessPixelRows(acc =>
-            {
+            var p = new DrawingBuffer(targetPosition.X, targetPosition.Y, sourceImageArea.Width, sourceImageArea.Height, bpp);
 
-                for (int i = 0; i < sourceImageArea.Height; i++)
-                {
-                    var rowBytes = acc.GetRowSpan(sourceImageArea.Y+i).Slice(sourceImageArea.X,sourceImageArea.Width);
-                    //var targetRow = p.GetRowBuffer(i).Span;
-                    //setDeviceStride(rowBytes, targetRow, p.PixelPerByte, p.GapLeft, p.GapRight, sourceImageArea.Width, bpp == ImagePixelPackEnum.BPP1);
-                    p.WriteRow(rowBytes, i, getByteFromL8);
-                }
+            Parallel.For(0, sourceImageArea.Height, i =>
+            {
+                var rowBytes = image.DangerousGetPixelRowMemory(sourceImageArea.Y + i).Span.Slice(sourceImageArea.X, sourceImageArea.Width);
+                p.WriteRow(rowBytes, i, getByteFromL8);
             });
             ushort x = (ushort)targetPosition.X;
             ushort y = (ushort)targetPosition.Y;
@@ -151,7 +135,7 @@ namespace WaveshareEInkDriver
             if (bpp == ImagePixelPackEnum.BPP1)
             {
                 //use bpp8 to transfer full bytes data
-                device.LoadImageArea(ImagePixelPackEnum.BPP8, ImageEndianTypeEnum.BigEndian, ImageRotateEnum.Rotate0, p.Buffer.Span,(ushort)(x/8),y,(ushort)(w/8),h);
+                device.LoadImageArea(ImagePixelPackEnum.BPP8, ImageEndianTypeEnum.BigEndian, ImageRotateEnum.Rotate0, p.Buffer.Span, (ushort)(x / 8), y, (ushort)(w / 8), h);
                 device.Set1BPPMode(true);
                 device.RefreshArea(displayMode, x, y, w, h);
                 device.Set1BPPMode(false);//restore to default display mode
@@ -162,13 +146,13 @@ namespace WaveshareEInkDriver
                 device.RefreshArea(displayMode, x, y, w, h);
             }
         }
-        
+
         //TODO: test display area buffer
 
         private static byte getByteFromL8(L8 source)
         {
             return source.PackedValue;
         }
-        
+
     }
 }
