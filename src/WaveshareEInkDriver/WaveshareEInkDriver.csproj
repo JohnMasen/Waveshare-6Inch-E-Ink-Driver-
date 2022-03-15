@@ -2,6 +2,12 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
+    <PackageTags>IT8951,SPI</PackageTags>
+    <Authors>Qian.Fan.Jiang</Authors>
+    <Description>A C# driver for Waveshare E-Ink 6' screen</Description>
+    <PackageProjectUrl>https://github.com/JohnMasen/Waveshare-6Inch-E-Ink-Driver-</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <ItemGroup>

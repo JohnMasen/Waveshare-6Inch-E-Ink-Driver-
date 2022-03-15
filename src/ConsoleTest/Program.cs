@@ -27,6 +27,7 @@ namespace ConsoleTest
                 .Build();
             bool waitEnter = config["wait"]?.ToLower() == "true";
             Console.WriteLine($"WaitEnter={waitEnter}");
+            //SPI settings for raspberry pi 4B
             SpiConnectionSettings settings = new SpiConnectionSettings(0, 0);
             settings.ClockFrequency = 12000000; //suggested 12MHZ in doc
             settings.Mode = SpiMode.Mode0;
@@ -34,6 +35,7 @@ namespace ConsoleTest
             settings.DataFlow = DataFlow.MsbFirst;
             SpiDevice spi = SpiDevice.Create(settings);
             Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(settings));
+
             var device = new IT8951SPIDevice(new IT8951SPIDeviceIO(spi, readyPin: 24, resetPin: 17));
             
             //uncomment line below to output debug info

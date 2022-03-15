@@ -15,9 +15,9 @@ namespace WaveshareEInkDriver
         /// </summary>
         /// <param name="device">device to present the image</param>
         /// <param name="image"> Image object</param>
-        /// <param name="dither"></param>
+        /// <param name="dither">dither the image for better visual</param>
         /// <param name="autoResize">Resize the image if necessary. An exception will thrown if this parameter is false and image size not equal device screen size</param>
-        /// <param name="bpp"></param>
+        /// <param name="bpp">BitsPerPixel mode in pixel transfer. suggest use BPP4 for GC16 and BPP1 for A2 </param>
         /// <param name="displayMode">Display mode, GC16=16 level greyscale, A2=Balck and White</param>
         public static void DrawImage(this IT8951SPIDevice device, Image<L8> image, bool dither = true, bool autoResize = true, ImagePixelPackEnum bpp = ImagePixelPackEnum.BPP4, DisplayModeEnum displayMode = DisplayModeEnum.GC16)
         {
@@ -107,7 +107,16 @@ namespace WaveshareEInkDriver
             }
 
         }
-
+        /// <summary>
+        /// Partial display image from Image Object
+        /// </summary>
+        /// <param name="device">device to present the image</param>
+        /// <param name="image">Image object</param>
+        /// <param name="sourceImageArea">the area to be displayed from source image</param>
+        /// <param name="targetPosition">the top left position to place the image of device screen</param>
+        /// <param name="bpp">BitsPerPixel mode in pixel transfer. suggest use BPP4 for GC16 and BPP1 for A2</param>
+        /// <param name="displayMode">Display mode, GC16=16 level greyscale, A2=Balck and White</param>
+        /// <exception cref="ArgumentOutOfRangeException">display mode cannot be INIT and position X and width must be multiple of 32 in 1bpp mode</exception>
         public static void DrawImagePartial(this IT8951SPIDevice device, Image<L8> image, Rectangle sourceImageArea, Point targetPosition, ImagePixelPackEnum bpp = ImagePixelPackEnum.BPP4, DisplayModeEnum displayMode = DisplayModeEnum.GC16)
         {
             if (displayMode == DisplayModeEnum.INIT)
